@@ -1,7 +1,7 @@
 FROM ubuntu:18.04 as build
 
-RUN apt-get update && \
-    apt-get install -y \
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
         binutils-mips-linux-gnu \
         bsdmainutils \
         build-essential \
@@ -11,7 +11,11 @@ RUN apt-get update && \
         libx11-dev \
         libcapstone-dev \
         pkgconf \
-        python3
+        python3 && \
+	apt-get clean && \
+	apt-get autoclean && \
+	apt-get autoremove && \
+	rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /sm64
 WORKDIR /sm64
