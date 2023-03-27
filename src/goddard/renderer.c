@@ -2,10 +2,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#if defined(VERSION_JP) || defined(VERSION_US)
-#include "prevent_bss_reordering.h"
-#endif
-
 #include "debug_utils.h"
 #include "draw_objects.h"
 #include "dynlist_proc.h"
@@ -66,7 +62,7 @@ struct GdDisplayList {
     /* GD DL Info */
     /*0x40*/ u32 id;     // user specified
     /*0x44*/ u32 number; // count
-    /*0x48*/ u8 pad48[4];
+    /*0x48*/ u8 filler[4];
     /*0x4C*/ struct GdDisplayList *parent; // not quite sure?
 };                                         /* sizeof = 0x50 */
 // accessor macros for gd dl
@@ -885,14 +881,14 @@ f64 stub_renderer_1(UNUSED f64 x) {
 /* 249BCC -> 24A19C */
 void gd_printf(const char *format, ...) {
     s32 i;
-    UNUSED u32 pad158;
+    UNUSED u8 filler1[4];
     char c;
     char f;
-    UNUSED u32 pad150;
+    UNUSED u8 filler2[4];
     char buf[0x100];
     char *csr = buf;
     char spec[8];    // specifier string
-    UNUSED u32 pad40;
+    UNUSED u8 filler3[4];
     union PrintVal val;
     va_list args;
 
@@ -1076,7 +1072,7 @@ void draw_indexed_dl(s32 dlNum, s32 gfxIdx) {
 /* 24A598 -> 24A610; orig name: func_8019BDC8 */
 void branch_cur_dl_to_num(s32 dlNum) {
     Gfx *dl;
-    UNUSED u32 pad[2];
+    UNUSED u8 filler[8];
 
     dl = sGdDLArray[dlNum]->gfx;
     gSPDisplayList(next_gfx(), GD_VIRTUAL_TO_PHYSICAL(dl));
@@ -1186,7 +1182,7 @@ void gdm_init(void *(*allocFn)(u32 size), void (*freeFn)(void *addr)) {
 #else
 /* 24AAE0 -> 24AB7C */
 void gdm_init(void *blockpool, u32 size) {
-    UNUSED u32 pad;
+    UNUSED u8 filler[4];
 
     imin("gdm_init");
     // Align downwards?
@@ -1207,7 +1203,7 @@ void gdm_init(void *blockpool, u32 size) {
  * Initializes the Mario head demo
  */
 void gdm_setup(void) {
-    UNUSED u32 pad;
+    UNUSED u8 filler[4];
 
     imin("gdm_setup");
     sYoshiSceneGrp = NULL;
@@ -1248,7 +1244,7 @@ struct ObjView *make_view_withgrp(char *name, struct ObjGroup *grp) {
 
 /* 24AD14 -> 24AEB8 */
 void gdm_maketestdl(s32 id) {
-    UNUSED u32 pad[3];
+    UNUSED u8 filler[12];
 
     imin("gdm_maketestdl");
     switch (id) {
@@ -1342,7 +1338,7 @@ s32 gd_sfx_to_play(void) {
 Gfx *gdm_gettestdl(s32 id) {
     struct GdObj *dobj;
     struct GdDisplayList *gddl;
-    UNUSED u32 pad28[2];
+    UNUSED u8 filler[8];
     struct GdVec3f vec;
 
     start_timer("dlgen");
@@ -1634,7 +1630,7 @@ void gd_dl_set_fill(struct GdColour *colour) {
 }
 
 /* 24CDB4 -> 24CE10; orig name: func_8019E5E4 */
-void gd_dl_set_zbuffer_area(void) {
+void gd_dl_set_z_buffer_area(void) {
     gDPSetDepthImage(next_gfx(), GD_LOWER_24(sActiveView->parent->zbuf));
 }
 
@@ -2020,7 +2016,7 @@ void func_801A0038(void) {
 
 /* 24E840 -> 24E9BC */
 void gd_dl_flush_vertices(void) {
-    UNUSED u32 pad;
+    UNUSED u8 filler[4];
     s32 i;
     UNUSED s32 startvtx = sVertexBufStartIndex;
 
@@ -2105,13 +2101,13 @@ void gd_dl_hilite(s32 idx, // material GdDl number; offsets into hilite array
                    struct GdVec3f *arg4,   // vector to light source?
                    struct GdColour *colour // light color
 ) {
-    UNUSED u32 pad2[24];
+    UNUSED u8 filler1[96];
     Hilite *hilite; // 4c
     struct GdVec3f sp40;
     f32 sp3C; // magnitude of sp40
     f32 sp38;
     f32 sp34;
-    UNUSED u32 pad[6];
+    UNUSED u8 filler2[24];
 
     sp38 = 32.0f; // x scale factor?
     sp34 = 32.0f; // y scale factor?
@@ -2150,7 +2146,7 @@ void gd_dl_hilite(s32 idx, // material GdDl number; offsets into hilite array
  * Adds some display list commands that perform lighting for a material
  */
 s32 gd_dl_material_lighting(s32 id, struct GdColour *colour, s32 material) {
-    UNUSED u32 pad60[2];
+    UNUSED u8 filler[8];
     s32 i;
     s32 numLights = sNumLights;
     s32 scaledColours[3];
@@ -2342,7 +2338,7 @@ void Unknown801A1E70(void) {
     gDPPipeSync(next_gfx());
     gDPSetCycleType(next_gfx(), G_CYC_FILL);
     gDPSetRenderMode(next_gfx(), G_RM_OPA_SURF, G_RM_OPA_SURF2);
-    gd_dl_set_zbuffer_area();
+    gd_dl_set_z_buffer_area();
     gDPSetColorImage(next_gfx(), G_IM_FMT_RGBA, G_IM_SIZ_16b, sActiveView->parent->lowerRight.x,
                      GD_LOWER_24(sActiveView->parent->zbuf));
     gDPSetFillColor(next_gfx(), GPACK_ZDZ(G_MAXFBZ, 0) << 16 | GPACK_ZDZ(G_MAXFBZ, 0));
@@ -2361,7 +2357,7 @@ void gd_set_one_cycle(void) {
 
 /* 250B30 -> 250B44 */
 void stub_renderer_3(void) {
-    UNUSED u32 pad[4];
+    UNUSED u8 filler[16];
 }
 
 /* 250B44 -> 250B58 */
@@ -2556,8 +2552,7 @@ void stub_renderer_4(f32 arg0) {
     return;
 
     // dead code
-    if (D_801BD768.x * D_801A86CC.x + arg0 * 2.0f > 160.0)
-    {
+    if (D_801BD768.x * D_801A86CC.x + arg0 * 2.0f > 160.0) {
         func_801A3370(D_801BD758.x - D_801BD768.x, -20.0f, 0.0f);
         D_801BD768.x = D_801BD758.x;
     }
@@ -2755,11 +2750,11 @@ void gd_create_ortho_matrix(f32 l, f32 r, f32 b, f32 t, f32 n, f32 f) {
 /* 25245C -> 25262C */
 void gd_create_perspective_matrix(f32 fovy, f32 aspect, f32 near, f32 far) {
     u16 perspNorm;
-    UNUSED u32 unused1;
+    UNUSED u8 filler1[4];
     uintptr_t perspecMtx;
     uintptr_t rotMtx;
-    UNUSED u32 unused2;
-    UNUSED f32 unusedf = 0.0625f;
+    UNUSED u8 filler2[4];
+    UNUSED f32 unused = 0.0625f;
 
     sGdPerspTimer += 0.1;
     guPerspective(&DL_CURRENT_MTX(sCurrentGdDl), &perspNorm, fovy, aspect, near, far, 1.0f);
@@ -3026,9 +3021,9 @@ void stub_renderer_10(UNUSED u32 arg0) {
 
 /* 2530A8 -> 2530C0 */
 void stub_draw_label_text(UNUSED char *s) {
-    UNUSED u32 pad2;
+    UNUSED u8 filler1[4];
     UNUSED char *save = s;
-    UNUSED u8 pad[0x18];
+    UNUSED u8 filler2[24];
 }
 
 /* 2530C0 -> 2530D8; orig name: func_801A48F0 */
@@ -3144,13 +3139,13 @@ void Unknown801A4F58(void) {
             r = (s16)(colour >> 11 & 0x1F);
             g = (s16)(colour >> 6 & 0x1F);
             b = (s16)(colour >> 1 & 0x1F);
-            if ((r -= 1) < 0) {
+            if (--r < 0) {
                 r = 0;
             }
-            if ((g -= 1) < 0) {
+            if (--g < 0) {
                 g = 0;
             }
-            if ((b -= 1) < 0) {
+            if (--b < 0) {
                 b = 0;
             }
 
@@ -3172,7 +3167,7 @@ void Proc801A5110(struct ObjView *view) {
 
 /* 253938 -> 2539DC; orig name: func_801A5168 */
 void update_view_and_dl(struct ObjView *view) {
-    UNUSED u32 pad;
+    UNUSED u8 filler[4];
     s32 prevFlags; // 18
 
     prevFlags = view->flags;
@@ -3189,7 +3184,7 @@ void update_view_and_dl(struct ObjView *view) {
  * Unused - called by __main__
  */
 void func_801A520C(void) {
-    UNUSED u32 pad[2];
+    UNUSED u8 filler[8];
 
     start_timer("1frame");
     start_timer("cpu");
@@ -3239,7 +3234,7 @@ void Unknown801A5344(void) {
 /* 253BC8 -> 2540E0 */
 void gd_init(void) {
     s32 i; // 34
-    UNUSED u32 pad30;
+    UNUSED u8 filler[4];
     s8 *data; // 2c
 
     imin("gd_init");
@@ -3476,7 +3471,7 @@ void Unknown801A5D90(struct ObjGroup *arg0) {
         sp23C = FALSE;
 
         for (;;) {
-            trackerNum += 1;
+            trackerNum++;
             mt = get_memtracker_by_index(trackerNum);
 
             if (mt->name != NULL) {
@@ -3523,11 +3518,11 @@ void Unknown801A5FF8(struct ObjGroup *arg0) {
     struct ObjView *menuview;      // 3c
     UNUSED struct ObjLabel *label; // 38
     struct ObjGroup *menugrp;      // 34
-    UNUSED u32 pad2C[2];
+    UNUSED u8 filler[8];
 
     d_start_group("menug");
     sMenuGadgets[0] = d_makeobj(D_GADGET, "menu0");
-    d_set_obj_draw_flag(OBJ_IS_GRABBALE);
+    d_set_obj_draw_flag(OBJ_IS_GRABBABLE);
     d_set_world_pos(5.0f, 0.0f, 0.0f);
     d_set_scale(100.0f, 20.0f, 0.0f);
     d_set_type(6);
@@ -3538,7 +3533,7 @@ void Unknown801A5FF8(struct ObjGroup *arg0) {
     d_add_valptr("menu0", 0x40000, 0, (uintptr_t) NULL);
 
     sMenuGadgets[1] = d_makeobj(D_GADGET, "menu1");
-    d_set_obj_draw_flag(OBJ_IS_GRABBALE);
+    d_set_obj_draw_flag(OBJ_IS_GRABBABLE);
     d_set_world_pos(5.0f, 25.0f, 0.0f);
     d_set_scale(100.0f, 20.0f, 0.0f);
     d_set_type(6);
@@ -3549,7 +3544,7 @@ void Unknown801A5FF8(struct ObjGroup *arg0) {
     d_add_valptr("menu1", 0x40000, 0, (uintptr_t) NULL);
 
     sMenuGadgets[2] = d_makeobj(D_GADGET, "menu2");
-    d_set_obj_draw_flag(OBJ_IS_GRABBALE);
+    d_set_obj_draw_flag(OBJ_IS_GRABBABLE);
     d_set_world_pos(5.0f, 50.0f, 0.0f);
     d_set_scale(100.0f, 20.0f, 0.0f);
     d_set_type(6);
@@ -3641,7 +3636,7 @@ void view_proc_print_timers(struct ObjView *self) {
 void make_timer_gadgets(void) {
     struct ObjLabel *timerLabel;
     struct ObjGroup *timerg;
-    UNUSED u32 pad6C;
+    UNUSED u8 filler[4];
     struct ObjView *timersview;
     struct ObjGadget *bar1;
     struct ObjGadget *bar2;
@@ -3655,7 +3650,7 @@ void make_timer_gadgets(void) {
 
     d_start_group("timerg");
     d_makeobj(D_GADGET, "bar1");
-    d_set_obj_draw_flag(OBJ_IS_GRABBALE);
+    d_set_obj_draw_flag(OBJ_IS_GRABBABLE);
     d_set_world_pos(20.0f, 5.0f, 0.0f);
     d_set_scale(50.0f, 5.0f, 0.0f);
     d_set_type(4);
@@ -3666,7 +3661,7 @@ void make_timer_gadgets(void) {
     bar1->colourNum = COLOUR_WHITE;
 
     d_makeobj(D_GADGET, "bar2");
-    d_set_obj_draw_flag(OBJ_IS_GRABBALE);
+    d_set_obj_draw_flag(OBJ_IS_GRABBABLE);
     d_set_world_pos(70.0f, 5.0f, 0.0f);
     d_set_scale(50.0f, 5.0f, 0.0f);
     d_set_type(4);
@@ -3677,7 +3672,7 @@ void make_timer_gadgets(void) {
     bar2->colourNum = COLOUR_PINK;
 
     d_makeobj(D_GADGET, "bar3");
-    d_set_obj_draw_flag(OBJ_IS_GRABBALE);
+    d_set_obj_draw_flag(OBJ_IS_GRABBABLE);
     d_set_world_pos(120.0f, 5.0f, 0.0f);
     d_set_scale(50.0f, 5.0f, 0.0f);
     d_set_type(4);
@@ -3688,7 +3683,7 @@ void make_timer_gadgets(void) {
     bar3->colourNum = COLOUR_WHITE;
 
     d_makeobj(D_GADGET, "bar4");
-    d_set_obj_draw_flag(OBJ_IS_GRABBALE);
+    d_set_obj_draw_flag(OBJ_IS_GRABBABLE);
     d_set_world_pos(170.0f, 5.0f, 0.0f);
     d_set_scale(50.0f, 5.0f, 0.0f);
     d_set_type(4);
@@ -3699,7 +3694,7 @@ void make_timer_gadgets(void) {
     bar4->colourNum = COLOUR_PINK;
 
     d_makeobj(D_GADGET, "bar5");
-    d_set_obj_draw_flag(OBJ_IS_GRABBALE);
+    d_set_obj_draw_flag(OBJ_IS_GRABBABLE);
     d_set_world_pos(220.0f, 5.0f, 0.0f);
     d_set_scale(50.0f, 5.0f, 0.0f);
     d_set_type(4);
@@ -3710,7 +3705,7 @@ void make_timer_gadgets(void) {
     bar5->colourNum = COLOUR_WHITE;
 
     d_makeobj(D_GADGET, "bar6");
-    d_set_obj_draw_flag(OBJ_IS_GRABBALE);
+    d_set_obj_draw_flag(OBJ_IS_GRABBABLE);
     d_set_world_pos(270.0f, 5.0f, 0.0f);
     d_set_scale(50.0f, 5.0f, 0.0f);
     d_set_type(4);
@@ -3726,7 +3721,7 @@ void make_timer_gadgets(void) {
         timer = get_timernum(i);
 
         d_makeobj(D_GADGET, timerNameBuf);
-        d_set_obj_draw_flag(OBJ_IS_GRABBALE);
+        d_set_obj_draw_flag(OBJ_IS_GRABBABLE);
         d_set_world_pos(20.0f, (f32)((i * 15) + 15), 0.0f);
         d_set_scale(50.0f, 14.0f, 0);
         d_set_type(4);
@@ -3881,7 +3876,7 @@ void func_801A71CC(struct ObjNet *net) {
     f32 spAC;
     f32 spA8;
     struct GdBoundingBox bbox;
-    UNUSED u32 pad8C;
+    UNUSED u8 filler1[4];
     struct ObjZone *sp88;
     register struct ListNode *link;  // s0 (84)
     s32 sp80;                     // linked planes contained in zone?
@@ -3890,13 +3885,13 @@ void func_801A71CC(struct ObjNet *net) {
     register struct ListNode *link2; // s2 (74)
     register struct ListNode *link3; // s3 (70)
     struct GdVec3f sp64;
-    UNUSED u32 pad60;
+    UNUSED u8 filler2[4];
     struct ObjPlane *plane; // 5c
-    UNUSED u32 pad58;
+    UNUSED u8 filler3[4];
     struct ObjZone *linkedZone; // 54
-    UNUSED u32 pad50;
+    UNUSED u8 filler4[4];
     struct ObjPlane *planeL2; // 4c
-    UNUSED u32 pad48;
+    UNUSED u8 filler5[4];
     struct ObjPlane *planeL3; // 44
 
     if (net->unk21C == NULL) {
@@ -3945,11 +3940,11 @@ void func_801A71CC(struct ObjNet *net) {
 
         for (link2 = net->unk1CC->firstMember; link2 != NULL; link2 = link2->next) {
             planeL2 = (struct ObjPlane *) link2->obj;
-            sp7C += 1;
+            sp7C++;
             if (gd_plane_point_within(&planeL2->boundingBox, &sp88->boundingBox)) {
                 planeL2->unk18 = TRUE;
                 addto_group(sp88->unk2C, &planeL2->header);
-                sp80 += 1;
+                sp80++;
             }
         }
 

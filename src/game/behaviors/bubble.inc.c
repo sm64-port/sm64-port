@@ -1,4 +1,4 @@
-// bubble.c.inc
+// bubble.inc.c
 
 void bhv_object_bubble_init(void) {
     o->oPosX += random_float() * 30.0f;
