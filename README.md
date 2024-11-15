@@ -17,6 +17,14 @@ A prior copy of the game is required to extract the assets.
 4. Run `make` to build. Qualify the version through `make VERSION=<VERSION>`. Add `-j4` to improve build speed (hardware dependent based on the amount of CPU cores available).
 5. The executable binary will be located at `build/<VERSION>_pc/sm64.<VERSION>.f3dex2e`.
 
+### Docker
+
+1. Clone the repo: `git clone https://github.com/sm64-port/sm64-port.git`, which will create a directory `sm64-port` and then **enter** it `cd sm64-port`.
+2. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`.
+3. Build the Docker image using `docker build -t "sm64:latest" .`
+4. Run the Docker image using `docker run --rm --mount type=bind,source="$(pwd)",destination=/sm64 sm64 make VERSION=us -j4`, where `VERSION` should match the baserom.
+5. The executable binary will be located at `build/<VERSION>_pc/sm64.<VERSION>.f3dex2e`.
+
 ### Windows
 
 1. Install and update MSYS2, following all the directions listed on https://www.msys2.org/.
