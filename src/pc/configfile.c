@@ -44,6 +44,9 @@ unsigned int configKeyStickUp    = 0x11;
 unsigned int configKeyStickDown  = 0x1F;
 unsigned int configKeyStickLeft  = 0x1E;
 unsigned int configKeyStickRight = 0x20;
+// Deadzone value used for SDL and XInput (and WUP?) controllers
+// this number is the minimum magnitude out of (2 ** 15)
+unsigned int configDeadZone      = 4960;
 
 
 static const struct ConfigOption options[] = {
@@ -61,6 +64,7 @@ static const struct ConfigOption options[] = {
     {.name = "key_stickdown",  .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStickDown},
     {.name = "key_stickleft",  .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStickLeft},
     {.name = "key_stickright", .type = CONFIG_TYPE_UINT, .uintValue = &configKeyStickRight},
+    {.name = "joystick_deadzone", .type = CONFIG_TYPE_UINT, .uintValue = &configDeadZone},
 };
 
 // Reads an entire line from a file (excluding the newline character) and returns an allocated string

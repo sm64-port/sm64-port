@@ -11,12 +11,15 @@
 
 #include "controller_api.h"
 
-#define DEADZONE 4960
+#include "../configfile.h"
+
+/*#define DEADZONE 4960*/
 
 static bool init_ok;
 static SDL_GameController *sdl_cntrl;
 
 static void controller_sdl_init(void) {
+    printf("Initializing SDL Controllers\n");
     if (SDL_Init(SDL_INIT_GAMECONTROLLER) != 0) {
         fprintf(stderr, "SDL init error: %s\n", SDL_GetError());
         return;
@@ -24,6 +27,17 @@ static void controller_sdl_init(void) {
 
     init_ok = true;
 }
+
+#define DEBUG_SDL_RAW_INPUT 1
+
+#if DEBUG_SDL_RAW_INPUT
+int16_t prev_leftx;
+int16_t prev_lefty;
+int16_t prev_rightx;
+int16_t prev_righty;
+int16_t prev_ltrig;
+int16_t prev_rtrig;
+#endif
 
 static void controller_sdl_read(OSContPad *pad) {
     if (!init_ok) {
@@ -33,13 +47,17 @@ static void controller_sdl_read(OSContPad *pad) {
     SDL_GameControllerUpdate();
 
     if (sdl_cntrl != NULL && !SDL_GameControllerGetAttached(sdl_cntrl)) {
+        printf("Close SDL Game Controller: %p\n", sdl_cntrl);
         SDL_GameControllerClose(sdl_cntrl);
         sdl_cntrl = NULL;
     }
     if (sdl_cntrl == NULL) {
-        for (int i = 0; i < SDL_NumJoysticks(); i++) {
+        int num_joysticks = SDL_NumJoysticks();
+        for (int i = 0; i < num_joysticks; i++) {
             if (SDL_IsGameController(i)) {
+                const char* ctrl_name = SDL_GameControllerNameForIndex(i);
                 sdl_cntrl = SDL_GameControllerOpen(i);
+                printf("Found SDL Game Controller (%s) = %p\n", ctrl_name, sdl_cntrl);
                 if (sdl_cntrl != NULL) {
                     break;
                 }
@@ -86,8 +104,34 @@ static void controller_sdl_read(OSContPad *pad) {
     if (ltrig > 30 * 256) pad->button |= Z_TRIG;
     if (rtrig > 30 * 256) pad->button |= R_TRIG;
 
+#if DEBUG_SDL_RAW_INPUT
+
+    if (leftx != prev_leftx ||
+            lefty != prev_lefty ||
+            rightx != prev_rightx ||
+            righty != prev_righty ||
+            ltrig != prev_ltrig ||
+            rtrig != prev_rtrig)
+        {
+
+        printf("SDL: ");
+        printf("Lxy=%5d,%5d ", leftx, lefty);
+        printf("Rxy=%5d,%5d ", rightx, righty);
+        printf("LT=%5d ", ltrig);
+        printf("RT=%5d ", rtrig);
+        printf("\n");
+
+        prev_leftx = leftx;
+        prev_lefty = lefty;
+        prev_rightx = rightx;
+        prev_righty = righty;
+        prev_ltrig = ltrig;
+        prev_rtrig = rtrig;
+    }
+#endif
+
     uint32_t magnitude_sq = (uint32_t)(leftx * leftx) + (uint32_t)(lefty * lefty);
-    if (magnitude_sq > (uint32_t)(DEADZONE * DEADZONE)) {
+    if (magnitude_sq > (uint32_t)(configDeadZone * configDeadZone)) {
         // Game expects stick coordinates within -80..80
         // 32768 / 409 = ~80
         pad->stick_x = leftx / 409;

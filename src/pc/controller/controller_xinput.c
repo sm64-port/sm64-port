@@ -7,7 +7,9 @@
 
 #include "controller_api.h"
 
-#define DEADZONE 4960
+#include "../configfile.h"
+
+// #define DEADZONE 4960
 
 static void xinput_init(void) {
 }
@@ -32,7 +34,7 @@ static void xinput_read(OSContPad *pad) {
             if (gp->sThumbRY > 0x4000) pad->button |= U_CBUTTONS;
 
             uint32_t magnitude_sq = (uint32_t)(gp->sThumbLX * gp->sThumbLX) + (uint32_t)(gp->sThumbLY * gp->sThumbLY);
-            if (magnitude_sq > (uint32_t)(DEADZONE * DEADZONE)) {
+            if (magnitude_sq > (uint32_t)(configDeadZone * configDeadZone)) {
                 // Game expects stick coordinates within -80..80
                 // 32768 / 409 = ~80
                 pad->stick_x = gp->sThumbLX / 409;
