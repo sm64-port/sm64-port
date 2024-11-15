@@ -95,14 +95,12 @@ static void set_fullscreen(bool on, bool call_callback) {
     if (on) {
         SDL_DisplayMode mode;
         SDL_GetDesktopDisplayMode(0, &mode);
-        window_width = mode.w;
-        window_height = mode.h;
+        SDL_SetWindowSize(wnd, mode.w, mode.h);
+        SDL_SetWindowFullscreen(wnd, SDL_WINDOW_FULLSCREEN);
     } else {
-        window_width = DESIRED_SCREEN_WIDTH;
-        window_height = DESIRED_SCREEN_HEIGHT;
+        SDL_SetWindowFullscreen(wnd, 0);
+        SDL_SetWindowSize(wnd, window_width, window_height);
     }
-    SDL_SetWindowSize(wnd, window_width, window_height);
-    SDL_SetWindowFullscreen(wnd, on ? SDL_WINDOW_FULLSCREEN : 0);
 
     if (on_fullscreen_changed_callback != NULL && call_callback) {
         on_fullscreen_changed_callback(on);
@@ -165,7 +163,7 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
     int len = sprintf(title, "%s (%s)", game_name, GFX_API_NAME);
 
     wnd = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-            window_width, window_height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+            window_width, window_height, SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
 
     if (start_in_fullscreen) {
         set_fullscreen(true, false);
@@ -213,8 +211,10 @@ static void gfx_sdl_main_loop(void (*run_one_game_iter)(void)) {
 }
 
 static void gfx_sdl_get_dimensions(uint32_t *width, uint32_t *height) {
-    *width = window_width;
-    *height = window_height;
+    int drawable_width, drawable_height;
+    SDL_GL_GetDrawableSize(wnd, &drawable_width, &drawable_height);
+    *width = drawable_width;
+    *height = drawable_height;
 }
 
 static int translate_scancode(int scancode) {
@@ -257,7 +257,7 @@ static void gfx_sdl_handle_events(void) {
                 break;
 #endif
             case SDL_WINDOWEVENT:
-                if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
+                if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED && (SDL_GetWindowFlags(SDL_GetWindowFromID(event.window.windowID)) & SDL_WINDOW_FULLSCREEN) == 0) {
                     window_width = event.window.data1;
                     window_height = event.window.data2;
                 }
