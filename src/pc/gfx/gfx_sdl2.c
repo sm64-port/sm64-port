@@ -268,19 +268,20 @@ static void gfx_sdl_handle_events(void) {
     }
 }
 
+static Uint32 last_time;
 static bool gfx_sdl_start_frame(void) {
+    last_time = SDL_GetTicks();
     return true;
 }
 
 static void sync_framerate_with_timer(void) {
     // Number of milliseconds a frame should take (30 fps)
     const Uint32 FRAME_TIME = 1000 / 30;
-    static Uint32 last_time;
+
     Uint32 elapsed = SDL_GetTicks() - last_time;
 
     if (elapsed < FRAME_TIME)
         SDL_Delay(FRAME_TIME - elapsed);
-    last_time += FRAME_TIME;
 }
 
 static void gfx_sdl_swap_buffers_begin(void) {
