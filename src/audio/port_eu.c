@@ -4,6 +4,7 @@
 #include "data.h"
 #include "seqplayer.h"
 #include "synthesis.h"
+#include "heap.h" //! Fix the build using GCC version 14
 
 #ifdef VERSION_EU
 
