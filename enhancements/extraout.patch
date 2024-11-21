@@ -1,0 +1,253 @@
+diff --git a/extraout.py b/extraout.py
+new file mode 100755
+index 0000000..7cf4de4
+--- /dev/null
++++ b/extraout.py
+@@ -0,0 +1,43 @@
++#! /usr/bin/env python3
++from pypresence import Presence
++import time
++import json
++
++
++client_id = '813771660048990250'
++RPC = Presence(client_id, pipe=0)
++RPC.connect()
++
++readhere = False
++buffer = ""
++olddata = {}
++while True:
++    line = input()
++    if line == "---":
++        if readhere:
++            readhere = False
++            
++            buffer = json.loads(buffer)
++            del buffer["position"]
++            if buffer == olddata:
++                buffer = ""
++                continue
++            olddata = buffer
++            RPC.update(
++                details=f"In course {buffer['courseNum']} ({buffer['courseName']})",
++                state=f"Mission: {buffer['courseActNum']}\n"
++                      f"Stars: {buffer['stars']}\n"
++                      +(f"Coins: {buffer['coins']}\n" if buffer["courseNum"] != 0 else "")+
++                      f"Health: {buffer['health']}\n"
++                      f"Lives: {buffer['lives']}",
++                large_image=f"c{buffer['courseNum']}",
++                large_text=buffer["courseName"]
++            )
++            
++            buffer = ""
++        else:
++            readhere = True
++        continue
++    if (readhere):
++        buffer += line
++
+diff --git a/src/game/extraout.c b/src/game/extraout.c
+new file mode 100644
+index 0000000..b127015
+--- /dev/null
++++ b/src/game/extraout.c
+@@ -0,0 +1,171 @@
++#if defined(TARGET_LINUX) || defined(TARGET_WINDOWS) || defined(TARGET_MACOS)
++#define TARGET_PC
++#endif
++
++#ifdef TARGET_PC
++#include <stdio.h>
++#else
++#include "libc/stdio.h"
++#endif
++
++#include "sm64.h"
++#include "print.h"
++#include "area.h"
++#include "PR/gbi.h"
++#include "goddard/renderer.h"
++#include "segment2.h"
++#include "game_init.h"
++#include "hud.h"
++#include "ingame_menu.h"
++#include "level_update.h"
++
++static int show_hud =
++#ifdef TARGET_PC
++    0;
++#else
++    1;
++#endif
++static char *message = NULL;
++static char messagear[30];
++static int debugOutRefresh = 0;
++
++static const char charset[0x100] = {
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 7
++    ' ', ' ', 'a', 'b', 'c', 'd', 'e', 'f', // 15
++    'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', // 23
++    'o', 'p', 'q', 'r', 's', 't', 'u', 'v', // 31
++    'w', 'x', 'y', 'z', ' ', ' ', ' ', ' ', // 39
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 49
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 55
++    ' ', ' ', ' ', ' ', ' ', ' ', '\'', ' ', // 63
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 71
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 79
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 87
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 95
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 103
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ',', // 111
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 119
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 127
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 135
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 143
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 151
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', '-', // 159
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 167
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 175
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 183
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 192
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 199
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 207
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 215
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 223
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 231
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', // 239
++    ' ', ' ', '!', ' ', ' ', ' ', ' ', ' ', // 247
++    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '  // 255
++};
++
++
++void convertU8ptoCp(const u8 *in, char *out, u16 maxlen) {
++    int capsNext = TRUE;
++    
++    for (u16 it = 0; in[it] != 0xFF && it != maxlen; it++) {
++        if (in[it] < 0xFF) {
++            out[it] = charset[in[it]];
++            
++            // Capitalise
++            if (capsNext == TRUE && out[it] >= 'a' && out[it] <= 'z') {
++                out[it] -= 'a' - 'A';
++                capsNext = FALSE;
++            }
++        } else {
++            out[it] = ' ';
++        }
++        
++        if (out[it] == ' ' || out[it] == '-') {
++            capsNext = TRUE;
++        }
++    }
++}
++
++void extraout(void) {
++    // Update message every 30 frames
++    if (debugOutRefresh-- == 0) {
++        debugOutRefresh = 30;
++
++        // Get message
++        if (gHudDisplay.wedges == 0) {
++            message = "RIP Mario";
++        } else if (gHudDisplay.coins == 100) {
++            message = "Rich Mario";
++        } else {
++            // Format string
++            sprintf(messagear, "+*%d  H*%d  -*%d  ,*%d", gHudDisplay.coins, gHudDisplay.wedges,
++                    gHudDisplay.stars, gHudDisplay.lives);
++            message = messagear;
++        }
++
++#ifdef TARGET_PC
++        // Write to file
++        remove("message.txt");
++        FILE *ffile = fopen("message.txt", "w");
++        fputs(message, ffile);
++        fclose(ffile);
++
++        // Get course name
++        char courseName[32] = "Castle grounds";
++        if (gCurrCourseNum != 0) {
++            // Get course name table for current language
++            void **courseNameTbl;
++#ifndef VERSION_EU
++            courseNameTbl = segmented_to_virtual(seg2_course_name_table);
++#else
++            switch (gInGameLanguage) {
++                case LANGUAGE_ENGLISH:
++                    courseNameTbl = segmented_to_virtual(course_name_table_eu_en);
++                    break;
++                case LANGUAGE_FRENCH:
++                    courseNameTbl = segmented_to_virtual(course_name_table_eu_fr);
++                    break;
++                case LANGUAGE_GERMAN:
++                    courseNameTbl = segmented_to_virtual(course_name_table_eu_de);
++                    break;
++            }
++#endif
++            convertU8ptoCp(&segmented_to_virtual(courseNameTbl[gCurrCourseNum - 1])[3], courseName, sizeof(courseName));
++        }
++
++        // JSON output
++        float *pos = (gMarioStates[0].marioObj->header.gfx.pos);
++        setvbuf(stdout, NULL, _IONBF, 0);
++        printf("---\n"
++               "{\n"
++               "    \"message\": \"%s\",\n"
++               "    \"courseNum\": %d,\n"
++               "    \"courseActNum\": %d,\n"
++               "    \"courseName\": \"%s\",\n"
++               "    \"position\": [%f, %f, %f],\n"
++               "    \"health\": %i,\n"
++               "    \"lives\": %i,\n"
++               "    \"stars\": %i,\n"
++               "    \"coins\": %i,\n"
++               "    \"hudFlags\": %i\n"
++               "}\n"
++               "---\n",
++               message, gCurrCourseNum, gDialogCourseActNum, courseName, pos[0], pos[1], pos[2],
++               gHudDisplay.wedges, gHudDisplay.lives, gHudDisplay.stars, gHudDisplay.coins,
++               gHudDisplay.flags);
++#endif
++    }
++
++    // Print message every frame
++    if (message != NULL && show_hud) {
++        print_text(5, 5, message);
++    }
++
++    // Check if L was pressed in pause menu
++    if (sCurrPlayMode == 2) {
++        if (gPlayer1Controller->buttonPressed & R_TRIG) {
++            show_hud ^= 1;
++        }
++    }
++}
+diff --git a/src/game/extraout.h b/src/game/extraout.h
+new file mode 100644
+index 0000000..9481bf4
+--- /dev/null
++++ b/src/game/extraout.h
+@@ -0,0 +1 @@
++void extraout(void);
+diff --git a/src/game/hud.c b/src/game/hud.c
+index 8d4daa5..3c8c8e0 100644
+--- a/src/game/hud.c
++++ b/src/game/hud.c
+@@ -13,6 +13,7 @@
+ #include "area.h"
+ #include "save_file.h"
+ #include "print.h"
++#include "extraout.h"
+ 
+ /* @file hud.c
+  * This file implements HUD rendering and power meter animations.
+@@ -475,5 +476,7 @@ void render_hud(void) {
+         if (hudDisplayFlags & HUD_DISPLAY_FLAG_TIMER) {
+             render_hud_timer();
+         }
++        
++        extraout();
+     }
+ }
