@@ -3,7 +3,7 @@
 
 #include "../compat.h"
 
-#if defined(__linux__) || defined(__BSD__)
+#if (defined(__linux__) || defined(__BSD__)) && !defined(TARGET_SDL2)
 extern struct AudioAPI audio_alsa;
 #define HAVE_ALSA 1
 #else

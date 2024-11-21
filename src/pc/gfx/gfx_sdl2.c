@@ -1,6 +1,6 @@
 #include "../compat.h"
 
-#if !defined(__linux__) && !defined(__BSD__) && defined(ENABLE_OPENGL)
+#if (!defined(__linux__) && !defined(__BSD__) && defined(ENABLE_OPENGL)) || defined(TARGET_SDL2)
 
 #ifdef __MINGW32__
 #define FOR_WINDOWS 1
@@ -161,6 +161,12 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
     //SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
     //SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);
 
+    #ifdef USE_GLES
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);  // These attributes allow for hardware acceleration on RPis.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    #endif
+
     char title[512];
     int len = sprintf(title, "%s (%s)", game_name, GFX_API_NAME);
 
@@ -169,6 +175,7 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
 
     if (start_in_fullscreen) {
         set_fullscreen(true, false);
+        SDL_ShowCursor(SDL_FALSE);
     }
 
     SDL_GL_CreateContext(wnd);
@@ -241,6 +248,7 @@ static void gfx_sdl_onkeyup(int scancode) {
 
 static void gfx_sdl_handle_events(void) {
     SDL_Event event;
+    const Uint8 *state;
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
 #ifndef TARGET_WEB
@@ -250,6 +258,14 @@ static void gfx_sdl_handle_events(void) {
                     set_fullscreen(!fullscreen_state, true);
                     break;
                 }
+		if (event.key.keysym.sym == SDLK_F4) {
+		    state = SDL_GetKeyboardState(NULL);
+		    if (state[SDL_SCANCODE_LALT]) {
+		        SDL_Quit();
+		        exit(0);
+		    }
+		    break;
+                } 
                 gfx_sdl_onkeydown(event.key.keysym.scancode);
                 break;
             case SDL_KEYUP:
