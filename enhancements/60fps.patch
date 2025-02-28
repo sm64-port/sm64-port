@@ -395,13 +395,13 @@ index 9bc0e6e9..721ce968 100644
      { { 0, 0, 0 }, 0, { -498, 964 }, { 0xFF, 0xFF, 0xFF, 0xFF } },
  };
  
-+static Gfx sGfxSaved[60 / 5];
-+static Gfx *sBubbleInterpolatedDisplayListPos[60 / 5];
-+static Vec3s sPrevBubblePositions[60];
++static Gfx sGfxSaved[700 / 5];
++static Gfx *sBubbleInterpolatedDisplayListPos[700 / 5];
++static Vec3s sPrevBubblePositions[700];
 +
 +void patch_interpolated_bubble_particles(void) {
 +    s32 i;
-+    for (i = 0; i < 60 / 5; i++) {
++    for (i = 0; i < 700 / 5; i++) {
 +        if (sBubbleInterpolatedDisplayListPos[i] != NULL) {
 +            *sBubbleInterpolatedDisplayListPos[i] = sGfxSaved[i];
 +            sBubbleInterpolatedDisplayListPos[i] = NULL;
@@ -1924,8 +1924,8 @@ index 05f1a5ad..bb8ea052 100644
  static void sync_framerate_with_timer(void) {
 -    // Number of milliseconds a frame should take (30 fps)
 -    const Uint32 FRAME_TIME = 1000 / 30;
-+    // Number of milliseconds a frame should take (60 fps)
-+    const Uint32 FRAME_TIME = 1000 / 60;
++    // Number of milliseconds a frame should take (700 fps)
++    const Uint32 FRAME_TIME = 1000 / 700;
      static Uint32 last_time;
      Uint32 elapsed = SDL_GetTicks() - last_time;
  
