@@ -30,6 +30,15 @@ A prior copy of the game is required to extract the assets.
 6. Run `make` to build. Qualify the version through `make VERSION=<VERSION>`. Add `-j4` to improve build speed (hardware dependent based on the amount of CPU cores available).
 7. The executable binary will be located at `build/<VERSION>_pc/sm64.<VERSION>.f3dex2e.exe` inside the repository.
 
+### macOS (Apple Sillicon)
+
+1. Install Homebrew, following all the instructions listed on (https://brew.sh/).
+2. Install the required dependencies: `brew install make gcc mingw-w64 pkg-config sdl2 glew libusb git`.
+3. Clone the repo: `git clone https://github.com/sergioag/sm64-port-macos.git`, which will create a directory `sm64-port-macos` and then **enter** it `cd sm64-port-macos`.
+4. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`.
+5. Run `make` to build. Qualify the version through `make VERSION=<VERSION>`. Add `-j4` to improve build speed (hardware dependent based on the amount of CPU cores available).
+6. The executable binary will be located at `build/<VERSION>_pc/sm64.<VERSION>.f3dex2e`.
+
 #### Troubleshooting
 
 1. If you get `make: gcc: command not found` or `make: gcc: No such file or directory` although the packages did successfully install, you probably launched the wrong MSYS2. Read the instructions again. The terminal prompt should contain "MINGW32" or "MINGW64" in purple text, and **NOT** "MSYS".

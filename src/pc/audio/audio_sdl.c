@@ -1,9 +1,9 @@
 #if !defined(_WIN32) && !defined(_WIN64)
 
-#ifdef __MINGW32__
-#include "SDL.h"
+#if defined(__MINGW32__) || defined(TARGET_OSX)
+#include <SDL.h>
 #else
-#include "SDL2/SDL.h"
+#include <SDL2/SDL.h>
 #endif
 
 #include "audio_api.h"

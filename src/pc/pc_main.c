@@ -201,6 +201,11 @@ void main_func(void) {
         audio_api = &audio_sdl;
     }
 #endif
+#ifdef TARGET_OSX
+    if (audio_api == NULL && audio_sdl.init()) {
+        audio_api = &audio_sdl;
+    }
+#endif
     if (audio_api == NULL) {
         audio_api = &audio_null;
     }
