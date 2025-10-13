@@ -177,7 +177,7 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
     test_vsync();
     if (!vsync_enabled)
         puts("Warning: VSync is not enabled or not working. Falling back to timer for synchronization");
-
+    
     for (size_t i = 0; i < sizeof(windows_scancode_table) / sizeof(SDL_Scancode); i++) {
         inverted_scancode_table[windows_scancode_table[i]] = i;
     }
@@ -187,8 +187,8 @@ static void gfx_sdl_init(const char *game_name, bool start_in_fullscreen) {
     }
 
     for (size_t i = 0; i < sizeof(scancode_rmapping_nonextended) / sizeof(scancode_rmapping_nonextended[0]); i++) {
-        inverted_scancode_table[scancode_rmapping_extended[i][0]] = inverted_scancode_table[scancode_rmapping_extended[i][1]];
-        inverted_scancode_table[scancode_rmapping_extended[i][1]] += 0x100;
+        inverted_scancode_table[scancode_rmapping_nonextended[i][0]] = inverted_scancode_table[scancode_rmapping_nonextended[i][1]];
+        inverted_scancode_table[scancode_rmapping_nonextended[i][1]] += 0x100;
     }
 }
 
