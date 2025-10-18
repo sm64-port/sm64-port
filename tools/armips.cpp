@@ -1173,6 +1173,7 @@ public:
 };
 
 // file: Core/Expression.h
+#include <cstdint>
 #include <memory>
 
 inline std::wstring to_wstring(int64_t value)
