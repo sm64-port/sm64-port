@@ -48,6 +48,8 @@ SOFTWARE.
 #endif
 
 #include <cstdio>
+#include <cstdint>
+#include <cinttypes>
 #include <vector>
 #include <cstdlib>
 #include <cstdarg>
