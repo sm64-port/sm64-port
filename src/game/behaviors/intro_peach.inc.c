@@ -29,7 +29,7 @@ void bhv_intro_peach_loop(void) {
             gCurrentObject->oIntroPeachPitchFromFocus = -9984.f;
             gCurrentObject->oIntroPeachYawFromFocus = -768.f;
             gCurrentObject->oOpacity = 255;
-            gCurrentObject->header.gfx.unk38.animFrame = 100;
+            gCurrentObject->header.gfx.animInfo.animFrame = 100;
             break;
         case 1:
             intro_peach_set_pos_and_opacity(gCurrentObject, 0.f, 0.f);
@@ -40,7 +40,7 @@ void bhv_intro_peach_loop(void) {
         case 2:
             intro_peach_set_pos_and_opacity(gCurrentObject, 255.f, 3.f);
 
-            if ((gCurrentObject->oTimer > 100) && (get_dialog_id() == -1))
+            if ((gCurrentObject->oTimer > 100) && (get_dialog_id() == DIALOG_NONE))
                 gCurrentObject->oAction += 1;
             break;
         case 3:

@@ -28,8 +28,7 @@ extern OSMesgQueue *OSMesgQueues[];
 extern struct EuAudioCmd sAudioCmd[0x100];
 
 void func_8031D690(s32 player, FadeT fadeInTime);
-void sequence_player_fade_out_internal(s32 player, FadeT fadeOutTime);
-void port_eu_init_queues(void);
+void seq_player_fade_to_zero_volume(s32 player, FadeT fadeOutTime);
 void decrease_sample_dma_ttls(void);
 s32 audio_shut_down_and_reset_step(void);
 void func_802ad7ec(u32);
@@ -141,7 +140,7 @@ void create_next_audio_buffer(s16 *samples, u32 num_samples) {
     gAudioFrameCount++;
     decrease_sample_dma_ttls();
     if (osRecvMesg(OSMesgQueues[2], &msg, 0) != -1) {
-        gAudioResetPresetIdToLoad = (u8) (s32) msg;
+        gAudioResetPresetIdToLoad = (u8) (intptr_t) msg;
         gAudioResetStatus = 5;
     }
 
@@ -168,7 +167,6 @@ void eu_process_audio_cmd(struct EuAudioCmd *cmd) {
 
     case 0x82:
     case 0x88:
-        // load_sequence(arg1, arg2, 0);
         load_sequence(cmd->u.s.arg1, cmd->u.s.arg2, cmd->u.s.arg3);
         func_8031D690(cmd->u.s.arg1, cmd->u2.as_s32);
         break;
@@ -179,7 +177,7 @@ void eu_process_audio_cmd(struct EuAudioCmd *cmd) {
                 sequence_player_disable(&gSequencePlayers[cmd->u.s.arg1]);
             }
             else {
-                sequence_player_fade_out_internal(cmd->u.s.arg1, cmd->u2.as_s32);
+                seq_player_fade_to_zero_volume(cmd->u.s.arg1, cmd->u2.as_s32);
             }
         }
         break;
@@ -214,13 +212,13 @@ extern OSMesg OSMesg1;
 extern OSMesg OSMesg2;
 extern OSMesg OSMesg3;
 
-void sequence_player_fade_out_internal(s32 player, FadeT fadeOutTime) {
+void seq_player_fade_to_zero_volume(s32 player, FadeT fadeOutTime) {
     if (fadeOutTime == 0) {
         fadeOutTime = 1;
     }
     gSequencePlayers[player].fadeVelocity = -(gSequencePlayers[player].fadeVolume / fadeOutTime);
     gSequencePlayers[player].state = 2;
-    gSequencePlayers[player].fadeTimer = fadeOutTime;
+    gSequencePlayers[player].fadeRemainingFrames = fadeOutTime;
 
 }
 
@@ -228,7 +226,7 @@ void func_8031D690(s32 player, FadeT fadeInTime) {
     if (fadeInTime != 0) {
         gSequencePlayers[player].state = 1;
         gSequencePlayers[player].fadeTimerUnkEu = fadeInTime;
-        gSequencePlayers[player].fadeTimer = fadeInTime;
+        gSequencePlayers[player].fadeRemainingFrames = fadeInTime;
         gSequencePlayers[player].fadeVolume = 0.0f;
         gSequencePlayers[player].fadeVelocity = 0.0f;
     }
@@ -328,7 +326,7 @@ void func_802ad7ec(u32 arg0) {
                         chan->changes.as_bitfields.freqScale = TRUE;
                         break;
                     case 5:
-                        chan->reverb = cmd->u2.as_s8;
+                        chan->reverbVol = cmd->u2.as_s8;
                         break;
                     case 6:
                         if (cmd->u.s.arg3 < 8) {

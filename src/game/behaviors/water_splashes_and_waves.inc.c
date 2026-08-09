@@ -51,7 +51,7 @@ void bhv_water_splash_spawn_droplets(void) {
     if (o->oTimer == 0)
         o->oPosY = find_water_level(o->oPosX, o->oPosZ);
 
-    if (o->oPosY > -10000.0f) // Make sure it is not at the default water level
+    if (o->oPosY > FLOOR_LOWER_LIMIT_MISC) // Make sure it is not at the default water level
         for (i = 0; i < 3; i++)
             spawn_water_droplet(o, &sWaterSplashDropletParams);
 }
@@ -79,13 +79,13 @@ void bhv_water_droplet_loop(void) {
         } else if (o->oTimer > 20)
             obj_mark_for_deletion(o);
     }
-    if (waterLevel < -10000.0f)
+    if (waterLevel < FLOOR_LOWER_LIMIT_MISC)
         obj_mark_for_deletion(o);
 }
 
 void bhv_idle_water_wave_loop(void) {
     obj_copy_pos(o, gMarioObject);
-    o->oPosY = gMarioStates->waterLevel + 5;
+    o->oPosY = gMarioStates[0].waterLevel + 5;
     if (!(gMarioObject->oMarioParticleFlags & ACTIVE_PARTICLE_IDLE_WATER_WAVE)) {
         gMarioObject->oActiveParticleFlags &= (u16)~ACTIVE_PARTICLE_IDLE_WATER_WAVE;
         o->activeFlags = ACTIVE_FLAG_DEACTIVATED;

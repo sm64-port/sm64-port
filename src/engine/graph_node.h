@@ -18,7 +18,7 @@
 #define GRAPH_NODE_TYPE_FUNCTIONAL            0x100
 
 // Type used for Bowser and an unused geo function in obj_behaviors.c
-#define GRAPH_NODE_TYPE_400                   0x400				
+#define GRAPH_NODE_TYPE_400                   0x400
 
 // The discriminant for different types of geo nodes
 #define GRAPH_NODE_TYPE_ROOT                  0x001
@@ -420,7 +420,7 @@ void geo_obj_init_animation_accel(struct GraphNodeObject *graphNode, struct Anim
 
 s32 retrieve_animation_index(s32 frame, u16 **attributes);
 
-s16 geo_update_animation_frame(struct GraphNodeObject_sub *obj, s32 *accelAssist);
+s16 geo_update_animation_frame(struct AnimInfo *obj, s32 *accelAssist);
 void geo_retreive_animation_translation(struct GraphNodeObject *obj, Vec3f position);
 
 struct GraphNodeRoot *geo_find_root(struct GraphNode *graphNode);

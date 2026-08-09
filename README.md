@@ -4,9 +4,8 @@ PSP Project Discord: https://discord.gg/5w4B69
 
 # Super Mario 64 Port
 
-- This repo contains a full decompilation of Super Mario 64 (J), (U), and (E) with minor exceptions in the audio subsystem.
+- This repo contains a full decompilation of Super Mario 64 (J), (U), (E), and (SH).
 - Naming and documentation of the source code and data structures are in progress.
-- Efforts to decompile the Shindou ROM steadily advance toward a matching build.
 - Beyond Nintendo 64, it can also target Linux and Windows natively.
 
 This repo does not include all assets necessary for compiling the game.
@@ -87,6 +86,7 @@ Windows Possible Guide: NOTE UNSUPPORTED currently
 3. If you get `make: *** No targets specified and no makefile found. Stop.`, you are not in the correct directory. Make sure the yellow text in the terminal ends with `sm64-port`. Use `cd <dir>` to enter the correct directory. If you write `ls` you should see all the project files, including `Makefile` if everything is correct.
 4. If you get any error, be sure MSYS2 packages are up to date by executing `pacman -Syu` and `pacman -Su`. If the MSYS2 window closes immediately after opening it, restart your computer.
 5. When you execute `gcc -v`, be sure you see `Target: i686-w64-mingw32` or `Target: x86_64-w64-mingw32`. If you see `Target: x86_64-pc-msys`, you either opened the wrong MSYS start menu entry or installed the incorrect gcc package.
+6. When switching between building for other platforms, run `make -C tools clean` first to allow for the tools to recompile on the new platform. This also helps when switching between shells like WSL and MSYS2.
 
 ### Debugging
 
@@ -97,37 +97,35 @@ The code can be debugged using `gdb`. On Linux install the `gdb` package and exe
 It is possible to build N64 ROMs as well with this repository. See https://github.com/n64decomp/sm64 for instructions.
 
 ## Project Structure
-
-```
-sm64
-├── actors: object behaviors, geo layout, and display lists
-├── asm: handwritten assembly code, rom header
-│   └── non_matchings: asm for non-matching sections
-├── assets: animation and demo data
-│   ├── anims: animation data
-│   └── demos: demo data
-├── bin: C files for ordering display lists and textures
-├── build: output directory
-├── data: behavior scripts, misc. data
-├── doxygen: documentation infrastructure
-├── enhancements: example source modifications
-├── include: header files
-├── levels: level scripts, geo layout, and display lists
-├── lib: SDK library code
-├── rsp: audio and Fast3D RSP assembly code
-├── sound: sequences, sound samples, and sound banks
-├── src: C source code for game
-│   ├── audio: audio code
-│   ├── buffers: stacks, heaps, and task buffers
-│   ├── engine: script processing engines and utils
-│   ├── game: behaviors and rest of game source
-│   ├── goddard: Mario intro screen
-│   ├── menu: title screen and file, act, and debug level selection menus
-│   └── pc: port code, audio and video renderer
-├── text: dialog, level names, act names
-├── textures: skybox and generic texture data
-└── tools: build tools
-```
+	
+	sm64
+	├── actors: object behaviors, geo layout, and display lists
+	├── asm: handwritten assembly code, rom header
+	│   └── non_matchings: asm for non-matching sections
+	├── assets: animation and demo data
+	│   ├── anims: animation data
+	│   └── demos: demo data
+	├── bin: C files for ordering display lists and textures
+	├── build: output directory
+	├── data: behavior scripts, misc. data
+	├── doxygen: documentation infrastructure
+	├── enhancements: example source modifications
+	├── include: header files
+	├── levels: level scripts, geo layout, and display lists
+	├── lib: SDK library code
+	├── rsp: audio and Fast3D RSP assembly code
+	├── sound: sequences, sound samples, and sound banks
+	├── src: C source code for game
+	│   ├── audio: audio code
+	│   ├── buffers: stacks, heaps, and task buffers
+	│   ├── engine: script processing engines and utils
+	│   ├── game: behaviors and rest of game source
+	│   ├── goddard: Mario intro screen
+	│   ├── menu: title screen and file, act, and debug level selection menus
+	│   └── pc: port code, audio and video renderer
+	├── text: dialog, level names, act names
+	├── textures: skybox and generic texture data
+	└── tools: build tools
 
 ## Contributing
 

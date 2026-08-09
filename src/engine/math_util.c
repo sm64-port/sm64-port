@@ -24,7 +24,14 @@ static inline int equals(const float a, const float b)
 // These functions have bogus return values.
 // Disable the compiler warning.
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wreturn-local-addr"
+
+#ifdef __GNUC__
+#if defined(__clang__)
+  #pragma GCC diagnostic ignored "-Wreturn-stack-address"
+#else
+  #pragma GCC diagnostic ignored "-Wreturn-local-addr"
+#endif
+#endif
 
 /// Copy vector 'src' to 'dest'
 void *vec3f_copy(Vec3f dest, Vec3f src) {
@@ -198,17 +205,15 @@ void mtxf_copy(Mat4 dest, Mat4 src) {
  * Set mtx to the identity matrix
  */
 void mtxf_identity(Mat4 mtx) {
-    __asm__ volatile(
-        "vmidt.q M100\n" //load identity matrix
-            
-        "sv.q   R100, 0(%0)\n"    // row 0
-        "sv.q   R101, 16(%0)\n"    // row 1
-        "sv.q   R102, 32(%0)\n"    // row 2
-        "sv.q   R103, 48(%0)\n"    // row 3
-        :
-        : "r"(mtx)
-        : "memory"
-    );
+    register s32 i;
+    register f32 *dest;
+    // These loops must be one line to match on -O2
+
+    // initialize everything except the first and last cells to 0
+    for (dest = (f32 *) mtx + 1, i = 0; i < 14; dest++, i++) *dest = 0;
+
+    // initialize the diagonal cells to 1
+    for (dest = (f32 *) mtx, i = 0; i < 4; dest += 5, i++) *dest = 1;
 }
 
 /**

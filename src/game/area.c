@@ -21,6 +21,7 @@
 #include "engine/geo_layout.h"
 #include "save_file.h"
 #include "level_table.h"
+#include "dialog_ids.h"
 
 struct SpawnInfo gPlayerSpawnInfos[1];
 struct GraphNode *D_8033A160[0x100];
@@ -32,7 +33,7 @@ s16 gCurrCourseNum;
 s16 gCurrActNum;
 s16 gCurrAreaIndex;
 s16 gSavedCourseNum;
-s16 gPauseScreenMode;
+s16 gMenuOptSelectIndex;
 s16 gSaveOptSelectIndex;
 
 struct SpawnInfo *gMarioSpawnInfo = &gPlayerSpawnInfos[0];
@@ -58,7 +59,6 @@ s16 gCurrLevelNum = LEVEL_MIN;
  * the spawn behavior executed, the index of that behavior is used with sSpawnTypeFromWarpBhv
 */
 
-// D_8032CE9C
 const BehaviorScript *sWarpBhvSpawnTable[] = {
     bhvDoorWarp,                bhvStar,                   bhvExitPodiumWarp,          bhvWarp,
     bhvWarpPipe,                bhvFadingWarp,             bhvInstantActiveWarp,       bhvAirborneWarp,
@@ -67,7 +67,6 @@ const BehaviorScript *sWarpBhvSpawnTable[] = {
     bhvAirborneStarCollectWarp, bhvAirborneDeathWarp,      bhvLaunchStarCollectWarp,   bhvLaunchDeathWarp,
 };
 
-// D_8032CEEC
 u8 sSpawnTypeFromWarpBhv[] = {
     MARIO_SPAWN_DOOR_WARP,             MARIO_SPAWN_UNKNOWN_02,           MARIO_SPAWN_UNKNOWN_03,            MARIO_SPAWN_UNKNOWN_03,
     MARIO_SPAWN_UNKNOWN_03,            MARIO_SPAWN_TELEPORT,             MARIO_SPAWN_INSTANT_ACTIVE,        MARIO_SPAWN_AIRBORNE,
@@ -108,7 +107,7 @@ void set_warp_transition_rgb(u8 red, u8 green, u8 blue) {
 
 void print_intro_text(void) {
 #ifdef VERSION_EU
-    int language = eu_get_language();
+    s32 language = eu_get_language();
 #endif
     if ((gGlobalTimer & 0x1F) < 20) {
         if (gControllerBits == 0) {
@@ -161,6 +160,11 @@ void load_obj_warp_nodes(void) {
     struct ObjectWarpNode *sp24;
     struct Object *sp20 = (struct Object *) gObjParentGraphNode.children;
 
+#ifdef USE_SYSTEM_MALLOC
+    if (sp20 == NULL) {
+        return;
+    }
+#endif
     do {
         struct Object *sp1C = sp20;
 
@@ -198,8 +202,8 @@ void clear_areas(void) {
         gAreaData[i].unused28 = NULL;
         gAreaData[i].whirlpools[0] = NULL;
         gAreaData[i].whirlpools[1] = NULL;
-        gAreaData[i].dialog[0] = 255;
-        gAreaData[i].dialog[1] = 255;
+        gAreaData[i].dialog[0] = DIALOG_NONE;
+        gAreaData[i].dialog[1] = DIALOG_NONE;
         gAreaData[i].musicParam = 0;
         gAreaData[i].musicParam2 = 0;
     }
@@ -253,7 +257,7 @@ void unload_area(void) {
 }
 
 void load_mario_area(void) {
-    func_80320890();
+    stop_sounds_in_continuous_banks();
     load_area(gMarioSpawnInfo->areaIndex);
 
     if (gCurrentArea->index == gMarioSpawnInfo->areaIndex) {
@@ -285,7 +289,7 @@ void change_area(s32 index) {
     }
 
     if (areaFlags & 0x01) {
-        gMarioObject->header.gfx.unk18 = index, gMarioSpawnInfo->areaIndex = index;
+        gMarioObject->header.gfx.areaIndex = index, gMarioSpawnInfo->areaIndex = index;
     }
 }
 
@@ -375,24 +379,25 @@ void render_game(void) {
         render_text_labels();
         do_cutscene_handler();
         print_displaying_credits_entry();
+
         gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
                       SCREEN_HEIGHT - BORDER_HEIGHT);
-        gPauseScreenMode = render_menus_and_dialogs();
-
-        if (gPauseScreenMode != 0) {
-            gSaveOptSelectIndex = gPauseScreenMode;
+        gMenuOptSelectIndex = render_menus_and_dialogs();
+        if (gMenuOptSelectIndex != MENU_OPT_NONE) {
+            gSaveOptSelectIndex = gMenuOptSelectIndex;
         }
 
         if (D_8032CE78 != NULL) {
             make_viewport_clip_rect(D_8032CE78);
-        } else
+        } else {
             gDPSetScissor(gDisplayListHead++, G_SC_NON_INTERLACE, 0, BORDER_HEIGHT, SCREEN_WIDTH,
                           SCREEN_HEIGHT - BORDER_HEIGHT);
+        }
 
         if (gWarpTransition.isActive) {
             if (gWarpTransDelay == 0) {
                 gWarpTransition.isActive = !render_screen_transition(0, gWarpTransition.type, gWarpTransition.time,
-                                                          &gWarpTransition.data);
+                                                                     &gWarpTransition.data);
                 if (!gWarpTransition.isActive) {
                     if (gWarpTransition.type & 1) {
                         gWarpTransition.pauseRendering = TRUE;
@@ -406,7 +411,7 @@ void render_game(void) {
         }
     } else {
         render_text_labels();
-        if (D_8032CE78 != 0) {
+        if (D_8032CE78 != NULL) {
             clear_viewport(D_8032CE78, gWarpTransFBSetColor);
         } else {
             clear_frame_buffer(gWarpTransFBSetColor);
@@ -414,5 +419,5 @@ void render_game(void) {
     }
 
     D_8032CE74 = NULL;
-    D_8032CE78 = 0;
+    D_8032CE78 = NULL;
 }

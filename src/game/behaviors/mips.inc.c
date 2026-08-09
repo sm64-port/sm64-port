@@ -8,19 +8,19 @@
  */
 void bhv_mips_init(void) {
     // Retrieve star flags for Castle Secret Stars on current save file.
-    u8 starFlags;
-    starFlags = save_file_get_star_flags(gCurrSaveFileNum - 1, -1);
+    u8 starFlags = save_file_get_star_flags(gCurrSaveFileNum - 1, -1);
 
     // If the player has >= 15 stars and hasn't collected first MIPS star...
-    if (save_file_get_total_star_count(gCurrSaveFileNum - 1, 0, 24) >= 15 && (starFlags & 0x08) == 0) {
+    if (save_file_get_total_star_count(gCurrSaveFileNum - 1, COURSE_MIN - 1, COURSE_MAX - 1) >= 15
+        && !(starFlags & SAVE_FLAG_TO_STAR_FLAG(SAVE_FLAG_COLLECTED_MIPS_STAR_1))) {
         o->oBehParams2ndByte = 0;
 #ifndef VERSION_JP
         o->oMipsForwardVelocity = 40.0f;
 #endif
     }
     // If the player has >= 50 stars and hasn't collected second MIPS star...
-    else if (save_file_get_total_star_count(gCurrSaveFileNum - 1, 0, 24) >= 50
-             && (starFlags & 0x10) == 0) {
+    else if (save_file_get_total_star_count(gCurrSaveFileNum - 1, COURSE_MIN - 1, COURSE_MAX - 1) >= 50
+             && !(starFlags & SAVE_FLAG_TO_STAR_FLAG(SAVE_FLAG_COLLECTED_MIPS_STAR_2))) {
         o->oBehParams2ndByte = 1;
 #ifndef VERSION_JP
         o->oMipsForwardVelocity = 45.0f;
@@ -60,7 +60,7 @@ s16 bhv_mips_find_furthest_waypoint_to_mario(void) {
 
     // For each waypoint in MIPS path...
     for (i = 0; i < 10; i++) {
-        waypoint = segmented_to_virtual(*(pathBase + i));
+        waypoint = segmented_to_virtual(pathBase[i]);
         x = waypoint->pos[0];
         y = waypoint->pos[1];
         z = waypoint->pos[2];
@@ -113,6 +113,9 @@ void bhv_mips_act_follow_path(void) {
     s32 followStatus;
     struct Waypoint **pathBase;
     struct Waypoint *waypoint;
+#ifdef AVOID_UB
+    followStatus = 0;
+#endif
 
     // Retrieve current waypoint.
     pathBase = segmented_to_virtual(&inside_castle_seg7_trajectory_mips);
@@ -164,7 +167,7 @@ void bhv_mips_act_fall_down(void) {
     s16 collisionFlags = 0;
 
     collisionFlags = object_step();
-    o->header.gfx.unk38.animFrame = 0;
+    o->header.gfx.animInfo.animFrame = 0;
 
     if ((collisionFlags & OBJ_COL_FLAG_GROUNDED) == 1) {
         o->oAction = MIPS_ACT_WAIT_FOR_ANIMATION_DONE;
@@ -239,13 +242,13 @@ void bhv_mips_held(void) {
         else
             dialogID = DIALOG_162;
 
-        if (set_mario_npc_dialog(1) == 2) {
+        if (set_mario_npc_dialog(MARIO_DIALOG_LOOK_FRONT) == MARIO_DIALOG_STATUS_SPEAK) {
             o->activeFlags |= ACTIVE_FLAG_INITIATED_TIME_STOP;
             if (cutscene_object_with_dialog(CUTSCENE_DIALOG, o, dialogID)) {
                 o->oInteractionSubtype |= INT_SUBTYPE_DROP_IMMEDIATELY;
                 o->activeFlags &= ~ACTIVE_FLAG_INITIATED_TIME_STOP;
                 o->oMipsStarStatus = MIPS_STAR_STATUS_SHOULD_SPAWN_STAR;
-                set_mario_npc_dialog(0);
+                set_mario_npc_dialog(MARIO_DIALOG_STOP);
             }
         }
     }

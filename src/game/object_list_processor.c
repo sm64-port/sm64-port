@@ -63,10 +63,12 @@ s16 gDebugInfoOverwrite[16][8];
  */
 u32 gTimeStopState;
 
+#ifndef USE_SYSTEM_MALLOC
 /**
  * The pool that objects are allocated from.
  */
 struct Object gObjectPool[OBJECT_POOL_CAPACITY];
+#endif
 
 /**
  * A special object whose purpose is to act as a parent for macro objects.
@@ -440,7 +442,7 @@ void unload_objects_from_area(UNUSED s32 unused, s32 areaIndex) {
             obj = (struct Object *) node;
             node = node->next;
 
-            if (obj->header.gfx.unk19 == areaIndex) {
+            if (obj->header.gfx.activeAreaIndex == areaIndex) {
                 unload_object(obj);
             }
         }
@@ -455,7 +457,7 @@ void spawn_objects_from_info(UNUSED s32 unused, struct SpawnInfo *spawnInfo) {
     gTimeStopState = 0;
 
     gWDWWaterLevelChanging = FALSE;
-    gMarioOnMerryGoRound = 0;
+    gMarioOnMerryGoRound = FALSE;
 
     //! (Spawning Displacement) On the Japanese version, Mario's platform object
     //  isn't cleared when transitioning between areas. This can cause Mario to
@@ -540,16 +542,20 @@ void clear_objects(void) {
 
     debug_unknown_level_select_check();
 
+#ifndef USE_SYSTEM_MALLOC
     init_free_object_list();
+#endif
     clear_object_lists(gObjectListArray);
 
     stub_behavior_script_2();
     stub_obj_list_processor_1();
 
+#ifndef USE_SYSTEM_MALLOC
     for (i = 0; i < OBJECT_POOL_CAPACITY; i++) {
         gObjectPool[i].activeFlags = ACTIVE_FLAG_DEACTIVATED;
         geo_reset_object_node(&gObjectPool[i].header.gfx);
     }
+#endif
 
     gObjectMemoryPool = mem_pool_init(0x800, MEMORY_POOL_LEFT);
     gObjectLists = gObjectListArray;
@@ -602,7 +608,7 @@ void unload_deactivated_objects(void) {
 /**
  * Unused profiling function.
  */
-static u16 unused_get_elapsed_time(u64 *cycleCounts, s32 index) {
+UNUSED static u16 unused_get_elapsed_time(u64 *cycleCounts, s32 index) {
     u16 time;
     f64 cycles;
 

@@ -49,7 +49,7 @@ void hoot_free_step(s16 fastOscY, s32 speed) {
     struct FloorGeometry *sp2c;
     s16 yaw = o->oMoveAngleYaw;
     s16 pitch = o->oMoveAnglePitch;
-    s16 sp26 = o->header.gfx.unk38.animFrame;
+    s16 sp26 = o->header.gfx.animInfo.animFrame;
     f32 xPrev = o->oPosX;
     f32 zPrev = o->oPosZ;
     f32 hSpeed;
@@ -95,7 +95,7 @@ void hoot_player_set_yaw(void) {
 void hoot_carry_step(s32 speed, UNUSED f32 xPrev, UNUSED f32 zPrev) {
     s16 yaw = o->oMoveAngleYaw;
     s16 pitch = o->oMoveAnglePitch;
-    s16 sp22 = o->header.gfx.unk38.animFrame;
+    s16 sp22 = o->header.gfx.animInfo.animFrame;
     f32 hSpeed;
 
     o->oVelY = sins(pitch) * speed;
@@ -161,7 +161,7 @@ void hoot_act_ascent(f32 xPrev, f32 zPrev) {
 
     if (o->oTimer >= 29) {
         cur_obj_play_sound_1(SOUND_ENV_WIND2);
-        o->header.gfx.unk38.animFrame = 1;
+        o->header.gfx.animInfo.animFrame = 1;
     }
 
     if (o->oPosY > 6500.0f)
@@ -225,7 +225,7 @@ void hoot_turn_to_home(void) {
 }
 
 void hoot_awake_loop(void) {
-    if (o->oInteractStatus == INT_STATUS_HOOT_GRABBED_BY_MARIO) {
+    if (o->oInteractStatus == TRUE) { //! Note: Not a flag, treated as a TRUE/FALSE statement
         hoot_action_loop();
         cur_obj_init_animation(1);
     } else {
@@ -254,8 +254,9 @@ void bhv_hoot_loop(void) {
         case HOOT_AVAIL_WANTS_TO_TALK:
             hoot_awake_loop();
 
-            if (set_mario_npc_dialog(2) == 2 && cutscene_object_with_dialog(CUTSCENE_DIALOG, o, DIALOG_044)) {
-                set_mario_npc_dialog(0);
+            if (set_mario_npc_dialog(MARIO_DIALOG_LOOK_UP) == MARIO_DIALOG_STATUS_SPEAK 
+                && cutscene_object_with_dialog(CUTSCENE_DIALOG, o, DIALOG_044)) {
+                set_mario_npc_dialog(MARIO_DIALOG_STOP);
 
                 cur_obj_become_tangible();
 

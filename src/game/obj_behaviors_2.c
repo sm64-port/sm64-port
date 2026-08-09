@@ -15,6 +15,7 @@
 #include "engine/surface_load.h"
 #include "game_init.h"
 #include "geo_misc.h"
+#include "ingame_menu.h"
 #include "interaction.h"
 #include "level_table.h"
 #include "level_update.h"
@@ -98,10 +99,11 @@ static s16 obj_get_pitch_from_vel(void) {
  */
 static s32 obj_update_race_proposition_dialog(s16 dialogID) {
     s32 dialogResponse =
-        cur_obj_update_dialog_with_cutscene(2, DIALOG_UNK2_FLAG_0 | DIALOG_UNK2_LEAVE_TIME_STOP_ENABLED, CUTSCENE_RACE_DIALOG, dialogID);
+        cur_obj_update_dialog_with_cutscene(MARIO_DIALOG_LOOK_UP,
+        (DIALOG_FLAG_TURN_TO_MARIO | DIALOG_FLAG_TIME_STOP_ENABLED), CUTSCENE_RACE_DIALOG, dialogID);
 
-    if (dialogResponse == 2) {
-        set_mario_npc_dialog(0);
+    if (dialogResponse == DIALOG_RESPONSE_NO) {
+        set_mario_npc_dialog(MARIO_DIALOG_STOP);
         disable_time_stop_including_mario();
     }
 
@@ -362,7 +364,7 @@ static s32 cur_obj_set_anim_if_at_end(s32 arg0) {
 static s32 cur_obj_play_sound_at_anim_range(s8 arg0, s8 arg1, u32 sound) {
     s32 val04;
 
-    if ((val04 = o->header.gfx.unk38.animAccel / 0x10000) <= 0) {
+    if ((val04 = o->header.gfx.animInfo.animAccel / 0x10000) <= 0) {
         val04 = 1;
     }
 
@@ -640,7 +642,7 @@ static void obj_die_if_health_non_positive(void) {
     }
 }
 
-static void obj_unused_die(void) {
+UNUSED static void obj_unused_die(void) {
     o->oHealth = 0;
     obj_die_if_health_non_positive();
 }
@@ -759,7 +761,7 @@ static s32 obj_handle_attacks(struct ObjectHitbox *hitbox, s32 attackedMarioActi
 static void obj_act_knockback(UNUSED f32 baseScale) {
     cur_obj_update_floor_and_walls();
 
-    if (o->header.gfx.unk38.curAnim != NULL) {
+    if (o->header.gfx.animInfo.curAnim != NULL) {
         cur_obj_extend_animation_if_at_end();
     }
 
@@ -778,7 +780,7 @@ static void obj_act_squished(f32 baseScale) {
 
     cur_obj_update_floor_and_walls();
 
-    if (o->header.gfx.unk38.curAnim != NULL) {
+    if (o->header.gfx.animInfo.curAnim != NULL) {
         cur_obj_extend_animation_if_at_end();
     }
 
@@ -932,20 +934,18 @@ static void treat_far_home_as_mario(f32 threshold) {
 #include "behaviors/flying_bookend_switch.inc.c"
 
 /**
- * Used by fly guy, piranha plant, and fire spitters.
+ * Used by bowser, fly guy, piranha plant, and fire spitters.
  */
 void obj_spit_fire(s16 relativePosX, s16 relativePosY, s16 relativePosZ, f32 scale, s32 model,
                    f32 startSpeed, f32 endSpeed, s16 movePitch) {
-    struct Object *sp2C;
+    struct Object *obj = spawn_object_relative_with_scale(1, relativePosX, relativePosY, relativePosZ,
+                                                           scale, o, model, bhvSmallPiranhaFlame);
 
-    sp2C = spawn_object_relative_with_scale(1, relativePosX, relativePosY, relativePosZ, scale, o,
-                                            model, bhvSmallPiranhaFlame);
-
-    if (sp2C != NULL) {
-        sp2C->oSmallPiranhaFlameUnkF4 = startSpeed;
-        sp2C->oSmallPiranhaFlameUnkF8 = endSpeed;
-        sp2C->oSmallPiranhaFlameUnkFC = model;
-        sp2C->oMoveAnglePitch = movePitch;
+    if (obj != NULL) {
+        obj->oSmallPiranhaFlameStartSpeed = startSpeed;
+        obj->oSmallPiranhaFlameEndSpeed = endSpeed;
+        obj->oSmallPiranhaFlameModel = model;
+        obj->oMoveAnglePitch = movePitch;
     }
 }
 

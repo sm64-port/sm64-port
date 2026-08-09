@@ -18,6 +18,7 @@
 #include "gfx/gfx_glx.h"
 #include "gfx/gfx_psp.h"
 #include "gfx/gfx_sdl.h"
+#include "gfx/gfx_dummy.h"
 
 #include "audio/audio_api.h"
 #include "audio/audio_psp.h"
@@ -53,11 +54,11 @@ const char _srcver[] __attribute__((section (".version"), used)) = MODULE_NAME "
 
 #define CONFIG_FILE "sm64config.txt"
 
-OSMesg D_80339BEC;
+OSMesg gMainReceivedMesg;
 OSMesgQueue gSIEventMesgQueue;
 
 s8 gResetTimer;
-s8 D_8032C648;
+s8 gNmiResetBarsTimer;
 s8 gDebugLevelSelect;
 s8 gShowProfiler;
 s8 gShowDebugText;
@@ -80,7 +81,7 @@ void set_vblank_handler(UNUSED s32 index, UNUSED struct VblankHandler *handler, 
 static uint8_t inited = 0;
 
 #include "game/game_init.h" // for gGlobalTimer
-void send_display_list(struct SPTask *spTask) {
+void exec_display_list(struct SPTask *spTask) {
     if (!inited) {
         return;
     }
@@ -182,14 +183,14 @@ static void on_fullscreen_changed(bool is_now_fullscreen) {
     configFullscreen = is_now_fullscreen;
 }
 
-void main_func(const char *argv0) {
-#if defined(TARGET_PSP)
-    (void)psp_me_boot();
-    psp_home_menu_init();
-#endif
-
-    static u32 pool[0x165000/8 / 4 * sizeof(void *) * 4];
+void main_func(void) {
+#ifdef USE_SYSTEM_MALLOC
+    main_pool_init();
+    gGfxAllocOnlyPool = alloc_only_pool_init();
+#else
+    static u64 pool[0x165000/8 / 4 * sizeof(void *)];
     main_pool_init(pool, pool + sizeof(pool) / sizeof(pool[0]));
+#endif
     gEffectsMemoryPool = mem_pool_init(0x4000, MEMORY_POOL_LEFT);
 
     fs_init(argv0);
@@ -216,6 +217,9 @@ void main_func(const char *argv0) {
     #else
         wm_api = &gfx_sdl;
     #endif
+#elif defined(ENABLE_GFX_DUMMY)
+    rendering_api = &gfx_dummy_renderer_api;
+    wm_api = &gfx_dummy_wm_api;
 #endif
 
     gfx_init(wm_api, rendering_api, "Super Mario 64 PC-Port", configFullscreen);

@@ -1,6 +1,8 @@
 #ifndef SEGMENTS_H
 #define SEGMENTS_H
 
+#include "config.h"
+
 /*
  * Memory addresses for segments. Ideally, this header file would not be
  * needed, and the addresses would be defined in sm64.ld and linker-inserted
@@ -20,10 +22,10 @@
 
 #define SEG_BUFFERS      0x801C1000
 
-#ifdef VERSION_EU
-#define SEG_MAIN         0x80241800 // TODO: Investigate why it's different?
-#elif defined(VERSION_SH)
+#if defined(VERSION_SH) || ENABLE_RUMBLE
 #define SEG_MAIN         0x80249000
+#elif defined(VERSION_EU)
+#define SEG_MAIN         0x80241800 // TODO: Investigate why it's different?
 #else
 #define SEG_MAIN         0x80246000
 #endif
@@ -44,7 +46,7 @@
  */
 
 #define SEG_BUFFERS      0x8005C000 // 0x0085000 in size
-#define SEG_MAIN         0x800E1000 // 0x1328000 in size
+#define SEG_MAIN         0x800E1000 // 0x0132800 in size
 #define SEG_ENGINE       0x80213800 // 0x0017000 in size
 #define SEG_FRAMEBUFFERS 0x8022A800 // 0x0070800 in size
 #define SEG_POOL_START   0x8029B000 // 0x0165000 in size

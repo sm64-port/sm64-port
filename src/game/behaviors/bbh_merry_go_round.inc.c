@@ -74,7 +74,7 @@ void bhv_merry_go_round_loop(void) {
             o->oMerryGoRoundMarioIsOutside++;
         }
     } else {
-        play_sound(SOUND_AIR_HOWLING_WIND, gDefaultSoundArgs);
+        play_sound(SOUND_AIR_HOWLING_WIND, gGlobalSoundSource);
 
         if (
             // There are objects outside BBH, such as corkboxes.
@@ -88,7 +88,7 @@ void bhv_merry_go_round_loop(void) {
     }
 
     // Rotate the merry-go-round and play appropriate music if it's not stopped.
-    if (o->oMerryGoRoundStopped == FALSE) {
+    if (!o->oMerryGoRoundStopped) {
         o->oAngleVelYaw = 0x80;
         o->oMoveAngleYaw += o->oAngleVelYaw;
         o->oFaceAngleYaw += o->oAngleVelYaw;

@@ -80,14 +80,17 @@
 
 #define INT_STATUS_ATTACK_MASK 0x000000FF
 
-#define INT_STATUS_HOOT_GRABBED_BY_MARIO (1 <<  0) /* 0x00000001 */
-#define INT_STATUS_MARIO_UNK1            (1 <<  1) /* 0x00000002 */
+// Mario Interaction Status
+#define INT_STATUS_MARIO_STUNNED         (1 <<  0) /* 0x00000001 */
+#define INT_STATUS_MARIO_KNOCKBACK_DMG   (1 <<  1) /* 0x00000002 */
 #define INT_STATUS_MARIO_UNK2            (1 <<  2) /* 0x00000004 */
 #define INT_STATUS_MARIO_DROP_OBJECT     (1 <<  3) /* 0x00000008 */
-#define INT_STATUS_MARIO_UNK4            (1 <<  4) /* 0x00000010 */
+#define INT_STATUS_MARIO_SHOCKWAVE       (1 <<  4) /* 0x00000010 */
 #define INT_STATUS_MARIO_UNK5            (1 <<  5) /* 0x00000020 */
 #define INT_STATUS_MARIO_UNK6            (1 <<  6) /* 0x00000040 */
 #define INT_STATUS_MARIO_UNK7            (1 <<  7) /* 0x00000080 */
+
+// Object Interaction Status
 #define INT_STATUS_GRABBED_MARIO         (1 << 11) /* 0x00000800 */
 #define INT_STATUS_ATTACKED_MARIO        (1 << 13) /* 0x00002000 */
 #define INT_STATUS_WAS_ATTACKED          (1 << 14) /* 0x00004000 */
@@ -104,7 +107,7 @@ void mario_grab_used_object(struct MarioState *m);
 void mario_drop_held_object(struct MarioState *m);
 void mario_throw_held_object(struct MarioState *m);
 void mario_stop_riding_and_holding(struct MarioState *m);
-u32 does_mario_have_hat(struct MarioState *m);
+u32 does_mario_have_normal_cap_on_head(struct MarioState *m);
 void mario_blow_off_cap(struct MarioState *m, f32 capSpeed);
 u32 mario_lose_cap_to_enemy(u32 arg);
 void mario_retrieve_cap(void);

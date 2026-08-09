@@ -3,7 +3,6 @@
 #include "prevent_bss_reordering.h"
 #include "sm64.h"
 #include "area.h"
-#include "audio/data.h"
 #include "audio/external.h"
 #include "behavior_data.h"
 #include "camera.h"
@@ -19,6 +18,7 @@
 #include "level_table.h"
 #include "level_update.h"
 #include "mario.h"
+#include "mario_actions_cutscene.h"
 #include "mario_actions_moving.h"
 #include "mario_step.h"
 #include "moving_texture.h"
@@ -27,10 +27,7 @@
 #include "save_file.h"
 #include "seq_ids.h"
 #include "sound_init.h"
-#include "thread6.h"
-
-// TODO: put this elsewhere
-enum SaveOption { SAVE_OPT_SAVE_AND_CONTINUE = 1, SAVE_OPT_SAVE_AND_QUIT, SAVE_OPT_CONTINUE_DONT_SAVE };
+#include "rumble_init.h"
 
 static struct Object *sIntroWarpPipeObj;
 static struct Object *sEndPeachObj;
@@ -49,7 +46,7 @@ static s8 D_8032CBE4 = 0;
 static s8 D_8032CBE8 = 0;
 static s8 D_8032CBEC[7] = { 2, 3, 2, 1, 2, 3, 2 };
 
-static u8 sStarsNeededForDialog[6] = { 1, 3, 8, 30, 50, 70 };
+static u8 sStarsNeededForDialog[] = { 1, 3, 8, 30, 50, 70 };
 
 /**
  * Data for the jumbo star cutscene. It specifies the flight path after triple
@@ -217,9 +214,9 @@ s32 geo_switch_peach_eyes(s32 run, struct GraphNode *node, UNUSED s32 a2) {
 }
 
 // unused
-static void stub_is_textbox_active(u16 *a0) {
-    if (get_dialog_id() == -1) {
-        *a0 = 0;
+UNUSED static void stub_is_textbox_active(u16 *arg) {
+    if (get_dialog_id() == DIALOG_NONE) {
+        *arg = 0;
     }
 }
 
@@ -235,7 +232,7 @@ s32 get_star_collection_dialog(struct MarioState *m) {
     s32 dialogID = 0;
     s32 numStarsRequired;
 
-    for (i = 0; i < 6; i++) {
+    for (i = 0; i < ARRAY_COUNT(sStarsNeededForDialog); i++) {
         numStarsRequired = sStarsNeededForDialog[i];
         if (m->prevNumStarsForDialog < numStarsRequired && m->numStars >= numStarsRequired) {
             dialogID = i + DIALOG_141;
@@ -251,23 +248,23 @@ s32 get_star_collection_dialog(struct MarioState *m) {
 void handle_save_menu(struct MarioState *m) {
     s32 dialogID;
     // wait for the menu to show up
-    if (is_anim_past_end(m) && gSaveOptSelectIndex != 0) {
+    if (is_anim_past_end(m) && gSaveOptSelectIndex != MENU_OPT_NONE) {
         // save and continue / save and quit
-        if (gSaveOptSelectIndex == SAVE_OPT_SAVE_AND_CONTINUE || gSaveOptSelectIndex == SAVE_OPT_SAVE_AND_QUIT) {
+        if (gSaveOptSelectIndex == MENU_OPT_SAVE_AND_CONTINUE || gSaveOptSelectIndex == MENU_OPT_SAVE_AND_QUIT) {
             save_file_do_save(gCurrSaveFileNum - 1);
 
-            if (gSaveOptSelectIndex == SAVE_OPT_SAVE_AND_QUIT) {
+            if (gSaveOptSelectIndex == MENU_OPT_SAVE_AND_QUIT) {
                 fade_into_special_warp(-2, 0); // reset game
             }
         }
 
         // not quitting
-        if (gSaveOptSelectIndex != SAVE_OPT_SAVE_AND_QUIT) {
+        if (gSaveOptSelectIndex != MENU_OPT_SAVE_AND_QUIT) {
             disable_time_stop();
             m->faceAngle[1] += 0x8000;
             // figure out what dialog to show, if we should
             dialogID = get_star_collection_dialog(m);
-            if (dialogID != 0) {
+            if (dialogID) {
                 play_peachs_jingle();
                 // look up for dialog
                 set_mario_action(m, ACT_READING_AUTOMATIC_DIALOG, dialogID);
@@ -346,24 +343,24 @@ s32 mario_ready_to_speak(void) {
 // 1 = starting dialog
 // 2 = speaking
 s32 set_mario_npc_dialog(s32 actionArg) {
-    s32 dialogState = 0;
+    s32 dialogState = MARIO_DIALOG_STATUS_NONE;
 
     // in dialog
     if (gMarioState->action == ACT_READING_NPC_DIALOG) {
         if (gMarioState->actionState < 8) {
-            dialogState = 1; // starting dialog
+            dialogState = MARIO_DIALOG_STATUS_START; // starting dialog
         }
         if (gMarioState->actionState == 8) {
-            if (actionArg == 0) {
+            if (actionArg == MARIO_DIALOG_STOP) {
                 gMarioState->actionState++; // exit dialog
             } else {
-                dialogState = 2;
+                dialogState = MARIO_DIALOG_STATUS_SPEAK;
             }
         }
     } else if (actionArg != 0 && mario_ready_to_speak()) {
         gMarioState->usedObj = gCurrentObject;
         set_mario_action(gMarioState, ACT_READING_NPC_DIALOG, actionArg);
-        dialogState = 1; // starting dialog
+        dialogState = MARIO_DIALOG_STATUS_START; // starting dialog
     }
 
     return dialogState;
@@ -382,10 +379,10 @@ s32 act_reading_npc_dialog(struct MarioState *m) {
     s32 headTurnAmount = 0;
     s16 angleToNPC;
 
-    if (m->actionArg == 2) {
+    if (m->actionArg == MARIO_DIALOG_LOOK_UP) {
         headTurnAmount = -1024;
     }
-    if (m->actionArg == 3) {
+    if (m->actionArg == MARIO_DIALOG_LOOK_DOWN) {
         headTurnAmount = 384;
     }
 
@@ -422,8 +419,8 @@ s32 act_reading_npc_dialog(struct MarioState *m) {
 
 // puts Mario in a state where he's waiting for (npc) dialog; doesn't do much
 s32 act_waiting_for_dialog(struct MarioState *m) {
-    set_mario_animation(m,
-                        m->heldObj == NULL ? MARIO_ANIM_FIRST_PERSON : MARIO_ANIM_IDLE_WITH_LIGHT_OBJ);
+    set_mario_animation(m, m->heldObj == NULL ? MARIO_ANIM_FIRST_PERSON
+                                              : MARIO_ANIM_IDLE_WITH_LIGHT_OBJ);
     vec3f_copy(m->marioObj->header.gfx.pos, m->pos);
     vec3s_set(m->marioObj->header.gfx.angle, 0, m->faceAngle[1], 0);
     return FALSE;
@@ -478,8 +475,8 @@ s32 act_reading_automatic_dialog(struct MarioState *m) {
         // finished action
         else if (m->actionState == 25) {
             disable_time_stop();
-            if (gShouldNotPlayCastleMusic) {
-                gShouldNotPlayCastleMusic = FALSE;
+            if (gNeverEnteredCastle) {
+                gNeverEnteredCastle = FALSE;
                 play_cutscene_music(SEQUENCE_ARGS(0, SEQ_LEVEL_INSIDE_CASTLE));
             }
             if (m->prevAction == ACT_STAR_DANCE_WATER) {
@@ -536,7 +533,6 @@ s32 act_reading_sign(struct MarioState *m) {
     return FALSE;
 }
 
-// debug free move action
 s32 act_debug_free_move(struct MarioState *m) {
     struct Surface *surf;
     f32 floorHeight;
@@ -591,7 +587,6 @@ s32 act_debug_free_move(struct MarioState *m) {
     return FALSE;
 }
 
-// star dance handler
 void general_star_dance_handler(struct MarioState *m, s32 isInWater) {
     s32 dialogID;
     if (m->actionState == 0) {
@@ -624,8 +619,8 @@ void general_star_dance_handler(struct MarioState *m, s32 isInWater) {
                 }
                 break;
         }
-    } else if (m->actionState == 1 && gDialogResponse) {
-        if (gDialogResponse == 1) {
+    } else if (m->actionState == 1 && gDialogResponse != DIALOG_RESPONSE_NONE) {
+        if (gDialogResponse == DIALOG_RESPONSE_YES) {
             save_file_do_save(gCurrSaveFileNum - 1);
         }
         m->actionState = 2;
@@ -633,7 +628,7 @@ void general_star_dance_handler(struct MarioState *m, s32 isInWater) {
         disable_time_stop();
         enable_background_sound();
         dialogID = get_star_collection_dialog(m);
-        if (dialogID != 0) {
+        if (dialogID) {
             // look up for dialog
             set_mario_action(m, ACT_READING_AUTOMATIC_DIALOG, dialogID);
         } else {
@@ -682,7 +677,6 @@ s32 act_fall_after_star_grab(struct MarioState *m) {
     return FALSE;
 }
 
-// general death hander
 s32 common_death_handler(struct MarioState *m, s32 animation, s32 frameToDeathWarp) {
     s32 animFrame = set_mario_animation(m, animation);
     if (animFrame == frameToDeathWarp) {
@@ -700,7 +694,7 @@ s32 act_standing_death(struct MarioState *m) {
 
     play_sound_if_no_flag(m, SOUND_MARIO_DYING, MARIO_ACTION_SOUND_PLAYED);
     common_death_handler(m, MARIO_ANIM_DYING_FALL_OVER, 80);
-    if (m->marioObj->header.gfx.unk38.animFrame == 77) {
+    if (m->marioObj->header.gfx.animInfo.animFrame == 77) {
         play_mario_landing_sound(m, SOUND_ACTION_TERRAIN_BODY_HIT_GROUND);
     }
     return FALSE;
@@ -793,7 +787,7 @@ s32 act_unlocking_key_door(struct MarioState *m) {
         set_mario_animation(m, MARIO_ANIM_UNLOCK_DOOR);
     }
 
-    switch (m->marioObj->header.gfx.unk38.animFrame) {
+    switch (m->marioObj->header.gfx.animInfo.animFrame) {
         case 79:
             play_sound(SOUND_GENERAL_DOOR_INSERT_KEY, m->marioObj->header.gfx.cameraToObject);
             break;
@@ -861,7 +855,6 @@ s32 act_unlocking_star_door(struct MarioState *m) {
     return FALSE;
 }
 
-// not sure what kind of door this is
 s32 act_entering_star_door(struct MarioState *m) {
     f32 targetDX;
     f32 targetDZ;
@@ -944,13 +937,11 @@ s32 act_going_through_door(struct MarioState *m) {
         if (m->actionTimer == 16) {
             level_trigger_warp(m, WARP_OP_WARP_DOOR);
         }
-    } else {
-        if (is_anim_at_end(m)) {
-            if (m->actionArg & 2) {
-                m->faceAngle[1] += 0x8000;
-            }
-            set_mario_action(m, ACT_IDLE, 0);
+    } else if (is_anim_at_end(m)) {
+        if (m->actionArg & 2) {
+            m->faceAngle[1] += 0x8000;
         }
+        set_mario_action(m, ACT_IDLE, 0);
     }
 
     m->actionTimer++;
@@ -966,7 +957,7 @@ s32 act_warp_door_spawn(struct MarioState *m) {
             m->usedObj->oInteractStatus = 0x00080000;
         }
     } else if (m->usedObj->oAction == 0) {
-        if (gShouldNotPlayCastleMusic == TRUE && gCurrLevelNum == LEVEL_CASTLE) {
+        if (gNeverEnteredCastle == TRUE && gCurrLevelNum == LEVEL_CASTLE) {
             set_mario_action(m, ACT_READING_AUTOMATIC_DIALOG, DIALOG_021);
         } else {
             set_mario_action(m, ACT_IDLE, 0);
@@ -1094,8 +1085,8 @@ s32 act_exit_land_save_dialog(struct MarioState *m) {
                     enable_time_stop();
                 }
 
-                set_menu_mode(RENDER_COURSE_DONE_SCREEN);
-                gSaveOptSelectIndex = 0;
+                set_menu_mode(MENU_MODE_RENDER_COURSE_COMPLETE_SCREEN);
+                gSaveOptSelectIndex = MENU_OPT_NONE;
 
                 m->actionState = 3; // star exit with cap
                 if (!(m->flags & MARIO_CAP_ON_HEAD)) {
@@ -1170,7 +1161,7 @@ s32 act_death_exit(struct MarioState *m) {
 #else
         play_sound(SOUND_MARIO_OOOF2, m->marioObj->header.gfx.cameraToObject);
 #endif
-#ifdef VERSION_SH
+#if ENABLE_RUMBLE
         queue_rumble_data(5, 80);
 #endif
         m->numLives--;
@@ -1205,7 +1196,7 @@ s32 act_falling_death_exit(struct MarioState *m) {
 #else
         play_sound(SOUND_MARIO_OOOF2, m->marioObj->header.gfx.cameraToObject);
 #endif
-#ifdef VERSION_SH
+#if ENABLE_RUMBLE
         queue_rumble_data(5, 80);
 #endif
         m->numLives--;
@@ -1252,7 +1243,7 @@ s32 act_special_death_exit(struct MarioState *m) {
     }
 
     if (launch_mario_until_land(m, ACT_HARD_BACKWARD_GROUND_KB, MARIO_ANIM_BACKWARD_AIR_KB, -24.0f)) {
-#ifdef VERSION_SH
+#if ENABLE_RUMBLE
         queue_rumble_data(5, 80);
 #endif
         m->numLives--;
@@ -1338,13 +1329,13 @@ s32 act_bbh_enter_spin(struct MarioState *m) {
             m->flags &= ~MARIO_UNKNOWN_08;
             if (perform_air_step(m, 0) == AIR_STEP_LANDED) {
                 level_trigger_warp(m, WARP_OP_UNKNOWN_02);
-#ifdef VERSION_SH
+#if ENABLE_RUMBLE
                 queue_rumble_data(15, 80);
 #endif
                 m->actionState = 4;
             }
             if (m->actionState == 2) {
-                if (m->marioObj->header.gfx.unk38.animFrame == 0) {
+                if (m->marioObj->header.gfx.animInfo.animFrame == 0) {
                     m->actionState = 3;
                 }
             } else {
@@ -1406,7 +1397,7 @@ s32 act_teleport_fade_out(struct MarioState *m) {
     set_mario_animation(m, m->prevAction == ACT_CROUCHING ? MARIO_ANIM_CROUCHING
                                                           : MARIO_ANIM_FIRST_PERSON);
 
-#ifdef VERSION_SH
+#if ENABLE_RUMBLE
     if (m->actionTimer == 0) {
         queue_rumble_data(30, 70);
         func_sh_8024C89C(2);
@@ -1432,7 +1423,7 @@ s32 act_teleport_fade_in(struct MarioState *m) {
     play_sound_if_no_flag(m, SOUND_ACTION_TELEPORT, MARIO_ACTION_SOUND_PLAYED);
     set_mario_animation(m, MARIO_ANIM_FIRST_PERSON);
 
-#ifdef VERSION_SH
+#if ENABLE_RUMBLE
     if (m->actionTimer == 0) {
         queue_rumble_data(30, 70);
         func_sh_8024C89C(2);
@@ -1523,9 +1514,9 @@ s32 act_squished(struct MarioState *m) {
                 }
 
                 // Both of the 1.8's are really floats, but one of them has to
-                // be written as a double for this to match on EU.
+                // be written as a double for this to match on -O2.
                 vec3f_set(m->marioObj->header.gfx.scale, 1.8, 0.05f, 1.8f);
-#ifdef VERSION_SH
+#if ENABLE_RUMBLE
                 queue_rumble_data(10, 80);
 #endif
                 m->actionState = 1;
@@ -1629,7 +1620,7 @@ void stuck_in_ground_handler(struct MarioState *m, s32 animation, s32 unstuckFra
     if (animFrame == -1) {
         play_sound_and_spawn_particles(m, SOUND_ACTION_TERRAIN_STUCK_IN_GROUND, 1);
     } else if (animFrame == unstuckFrame) {
-#ifdef VERSION_SH
+#if ENABLE_RUMBLE
         queue_rumble_data(5, 80);
 #endif
         play_sound_and_spawn_particles(m, SOUND_ACTION_UNSTUCK_FROM_GROUND, 1);
@@ -1735,7 +1726,7 @@ static void intro_cutscene_jump_out_of_pipe(struct MarioState *m) {
         set_mario_animation(m, MARIO_ANIM_SINGLE_JUMP);
         mario_set_forward_vel(m, 10.0f);
         if (perform_air_step(m, 0) == AIR_STEP_LANDED) {
-            sound_banks_enable(2, 0x0330);
+            sound_banks_enable(SEQ_PLAYER_SFX, SOUND_BANKS_DISABLED_DURING_INTRO_CUTSCENE);
             play_mario_landing_sound(m, SOUND_ACTION_TERRAIN_LANDING);
 #ifndef VERSION_JP
             play_sound(SOUND_MARIO_HAHA, m->marioObj->header.gfx.cameraToObject);
@@ -2059,9 +2050,12 @@ static void end_peach_cutscene_summon_jumbo_star(struct MarioState *m) {
     play_sound(SOUND_AIR_PEACH_TWINKLE, sEndJumboStarObj->header.gfx.cameraToObject);
 }
 
-#ifdef VERSION_EU
+#if defined(VERSION_EU)
     #define TIMER_FADE_IN_PEACH 201
     #define TIMER_DESCEND_PEACH 280
+#elif defined(VERSION_SH)
+    #define TIMER_FADE_IN_PEACH 276
+    #define TIMER_DESCEND_PEACH 400
 #else
     #define TIMER_FADE_IN_PEACH 276
     #define TIMER_DESCEND_PEACH 355
@@ -2073,7 +2067,7 @@ static void end_peach_cutscene_spawn_peach(struct MarioState *m) {
         play_transition(WARP_TRANSITION_FADE_INTO_COLOR, 14, 255, 255, 255);
     }
     if (m->actionTimer == 2) {
-        play_sound(SOUND_MENU_STAR_SOUND, gDefaultSoundArgs);
+        play_sound(SOUND_MENU_STAR_SOUND, gGlobalSoundSource);
     }
     if (m->actionTimer == 44) {
         play_transition(WARP_TRANSITION_FADE_FROM_COLOR, 192, 255, 255, 255);
@@ -2192,52 +2186,87 @@ static void end_peach_cutscene_dialog_1(struct MarioState *m) {
     }
 
     switch (m->actionTimer) {
+#ifdef VERSION_SH
+        case 110:
+#else
         case 80:
+#endif
             sEndPeachAnimation = 6;
             break;
-
+            
+#ifdef VERSION_SH
+        case 111:
+#else
         case 81:
+#endif
             D_8032CBE4 = 3;
             break;
 
+#ifdef VERSION_SH
+        case 175:
+#else
         case 145:
+#endif
             D_8032CBE4 = 2;
             break;
 
+#ifdef VERSION_SH
+        case 258:
+#else
         case 228:
+#endif
             D_8032CBE4 = 1;
             D_8032CBE8 = 1;
             break;
 
+#ifdef VERSION_SH
+        case 260:
+#else
         case 230:
+#endif
             set_cutscene_message(160, 227, 0, 30);
 #ifndef VERSION_JP
-            func_8031FFB4(SEQ_PLAYER_LEVEL, 60, 40);
+            seq_player_lower_volume(SEQ_PLAYER_LEVEL, 60, 40);
             play_sound(SOUND_PEACH_MARIO, sEndPeachObj->header.gfx.cameraToObject);
 #endif
             break;
 
+#ifdef VERSION_SH
+        case 305:
+#else
         case 275:
+#endif
             D_8032CBE4 = 0;
             D_8032CBE8 = 0;
             break;
 
+#ifdef VERSION_SH
+        case 320:
+#else
         case 290:
+#endif
             set_cutscene_message(160, 227, 1, 60);
 #ifndef VERSION_JP
             play_sound(SOUND_PEACH_POWER_OF_THE_STARS, sEndPeachObj->header.gfx.cameraToObject);
 #endif
             break;
 
+#ifdef VERSION_SH
+        case 510:
+#else
         case 480:
+#endif
             advance_cutscene_step(m);
             break;
     }
 }
 
-#ifdef VERSION_EU
+#if defined(VERSION_EU)
     #define TIMER_SOMETHING_SPECIAL 150
     #define TIMER_PEACH_KISS        260
+#elif defined(VERSION_SH)
+    #define TIMER_SOMETHING_SPECIAL 170
+    #define TIMER_PEACH_KISS        250
 #else
     #define TIMER_SOMETHING_SPECIAL 130
     #define TIMER_PEACH_KISS        200
@@ -2251,18 +2280,30 @@ static void end_peach_cutscene_dialog_2(struct MarioState *m) {
     sEndPeachAnimation = 9;
 
     switch (m->actionTimer) {
+#ifdef VERSION_SH
+        case 39:
+#else
         case 29:
+#endif
             set_cutscene_message(160, 227, 2, 30);
 #ifndef VERSION_JP
             play_sound(SOUND_PEACH_THANKS_TO_YOU, sEndPeachObj->header.gfx.cameraToObject);
 #endif
             break;
 
+#ifdef VERSION_SH
+        case 65:
+#else        
         case 45:
+#endif
             D_8032CBE8 = 1;
             break;
 
+#ifdef VERSION_SH
+        case 105:
+#else
         case 75:
+#endif
             set_cutscene_message(160, 227, 3, 30);
 #ifndef VERSION_JP
             play_sound(SOUND_PEACH_THANK_YOU_MARIO, sEndPeachObj->header.gfx.cameraToObject);
@@ -2373,7 +2414,7 @@ static void end_peach_cutscene_star_dance(struct MarioState *m) {
 
         case 140:
 #ifndef VERSION_JP
-            sequence_player_unlower(SEQ_PLAYER_LEVEL, 60);
+            seq_player_unlower_volume(SEQ_PLAYER_LEVEL, 60);
 #endif
             play_cutscene_music(SEQUENCE_ARGS(15, SEQ_EVENT_CUTSCENE_CREDITS));
             break;
@@ -2524,10 +2565,14 @@ static s32 act_end_peach_cutscene(struct MarioState *m) {
     return FALSE;
 }
 
-#ifdef VERSION_EU
+#if defined(VERSION_EU)
     #define TIMER_CREDITS_SHOW      51
     #define TIMER_CREDITS_PROGRESS  80
     #define TIMER_CREDITS_WARP     160
+#elif defined(VERSION_SH)
+    #define TIMER_CREDITS_SHOW      61
+    #define TIMER_CREDITS_PROGRESS  90
+    #define TIMER_CREDITS_WARP     204
 #else
     #define TIMER_CREDITS_SHOW      61
     #define TIMER_CREDITS_PROGRESS  90
@@ -2583,7 +2628,7 @@ static s32 act_credits_cutscene(struct MarioState *m) {
     }
 
     if (m->actionTimer++ == TIMER_CREDITS_WARP) {
-        level_trigger_warp(m, 24);
+        level_trigger_warp(m, WARP_OP_CREDITS_NEXT);
     }
 
     m->marioObj->header.gfx.angle[1] += (gCurrCreditsEntry->unk02 & 0xC0) << 8;
@@ -2701,10 +2746,8 @@ s32 mario_execute_cutscene_action(struct MarioState *m) {
     }
     /* clang-format on */
 
-    if (!cancel) {
-        if (m->input & INPUT_IN_WATER) {
-            m->particleFlags |= PARTICLE_IDLE_WATER_WAVE;
-        }
+    if (!cancel && (m->input & INPUT_IN_WATER)) {
+        m->particleFlags |= PARTICLE_IDLE_WATER_WAVE;
     }
 
     return cancel;

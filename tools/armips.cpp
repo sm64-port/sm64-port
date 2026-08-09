@@ -34,7 +34,6 @@ SOFTWARE.
 
 
 #define _CRT_SECURE_NO_WARNINGS
-#undef __STRICT_ANSI__
 
 #if defined(__clang__)
 #if __has_feature(cxx_exceptions)

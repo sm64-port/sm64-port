@@ -52,7 +52,11 @@ void bhv_big_bully_init(void) {
 }
 
 void bully_check_mario_collision(void) {
-    if (o->oInteractStatus & INT_STATUS_INTERACTED) {
+    if (
+#ifdef VERSION_SH
+    o->oAction != BULLY_ACT_LAVA_DEATH && o->oAction != BULLY_ACT_DEATH_PLANE_DEATH &&
+#endif
+    o->oInteractStatus & INT_STATUS_INTERACTED) {
         if (o->oBehParams2ndByte == BULLY_BP_SIZE_SMALL)
             cur_obj_play_sound_2(SOUND_OBJ2_BULLY_ATTACKED);
         else
@@ -98,7 +102,7 @@ void bully_act_knockback(void) {
         o->oMoveAngleYaw = o->oFaceAngleYaw;
         obj_turn_toward_object(o, gMarioObject, 16, 1280);
     } else
-        o->header.gfx.unk38.animFrame = 0;
+        o->header.gfx.animInfo.animFrame = 0;
 
     if (o->oBullyKBTimerAndMinionKOCounter == 18) {
         o->oAction = BULLY_ACT_CHASE_MARIO;
@@ -139,7 +143,7 @@ void bully_backup_check(s16 collisionFlags) {
 }
 
 void bully_play_stomping_sound(void) {
-    s16 sp26 = o->header.gfx.unk38.animFrame;
+    s16 sp26 = o->header.gfx.animInfo.animFrame;
     switch (o->oAction) {
         case BULLY_ACT_PATROL:
             if (sp26 == 0 || sp26 == 12) {
@@ -177,9 +181,9 @@ void bully_step(void) {
 
 void bully_spawn_coin(void) {
     struct Object *coin = spawn_object(o, MODEL_YELLOW_COIN, bhvMovingYellowCoin);
-#ifdef VERSION_JP //TODO: maybe move this ifdef logic to the header?
+#ifdef VERSION_JP // TODO: maybe move this ifdef logic to the header?
     cur_obj_play_sound_2(SOUND_GENERAL_COIN_SPURT);
-#elif VERSION_EU
+#elif defined(VERSION_EU) || defined(VERSION_SH)
     cur_obj_play_sound_2(SOUND_GENERAL_COIN_SPURT_EU);
 #else
     cur_obj_play_sound_2(SOUND_GENERAL_COIN_SPURT_2);
@@ -292,11 +296,7 @@ void big_bully_spawn_star(void) {
 }
 
 void bhv_big_bully_with_minions_loop(void) {
-#ifdef VERSION_EU
-    s32 collisionFlags;
-#else
     s16 collisionFlags;
-#endif
 
     o->oBullyPrevX = o->oPosX;
     o->oBullyPrevY = o->oPosY;

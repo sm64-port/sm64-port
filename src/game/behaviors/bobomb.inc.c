@@ -46,7 +46,7 @@ void bobomb_check_interactions(void) {
     obj_set_hitbox(o, &sBobombHitbox);
     if ((o->oInteractStatus & INT_STATUS_INTERACTED) != 0)
     {
-        if ((o->oInteractStatus & INT_STATUS_MARIO_UNK1) != 0)
+        if ((o->oInteractStatus & INT_STATUS_MARIO_KNOCKBACK_DMG) != 0)
         {
             o->oMoveAngleYaw = gMarioObject->header.gfx.angle[1];
             o->oForwardVel = 25.0;
@@ -69,12 +69,12 @@ void bobomb_act_patrol(void) {
     UNUSED s16 sp22;
     s16 collisionFlags;
 
-    sp22 = o->header.gfx.unk38.animFrame;
+    sp22 = o->header.gfx.animInfo.animFrame;
     o->oForwardVel = 5.0;
 
     collisionFlags = object_step();
     if ((obj_return_home_if_safe(o, o->oHomeX, o->oHomeY, o->oHomeZ, 400) == 1)
-        && (obj_check_if_facing_toward_angle(o->oMoveAngleYaw, o->oAngleToMario, 0x2000) == 1)) {
+        && (obj_check_if_facing_toward_angle(o->oMoveAngleYaw, o->oAngleToMario, 0x2000) == TRUE)) {
         o->oBobombFuseLit = 1;
         o->oAction = BOBOMB_ACT_CHASE_MARIO;
     }
@@ -85,7 +85,7 @@ void bobomb_act_chase_mario(void) {
     UNUSED u8 filler[4];
     s16 sp1a, collisionFlags;
 
-    sp1a = ++o->header.gfx.unk38.animFrame;
+    sp1a = ++o->header.gfx.animInfo.animFrame;
     o->oForwardVel = 20.0;
 
     collisionFlags = object_step();
@@ -286,7 +286,7 @@ void bhv_bobomb_buddy_init(void) {
 
 void bobomb_buddy_act_idle(void) {
     UNUSED u8 filler[4];
-    s16 sp1a = o->header.gfx.unk38.animFrame;
+    s16 sp1a = o->header.gfx.animInfo.animFrame;
     UNUSED s16 collisionFlags = 0;
 
     o->oBobombBuddyPosXCopy = o->oPosX;
@@ -344,7 +344,7 @@ void bobomb_buddy_cannon_dialog(s16 dialogFirstText, s16 dialogSecondText) {
             break;
 
         case BOBOMB_BUDDY_CANNON_STOP_TALKING:
-            set_mario_npc_dialog(0);
+            set_mario_npc_dialog(MARIO_DIALOG_STOP);
 
             o->activeFlags &= ~ACTIVE_FLAG_INITIATED_TIME_STOP;
             o->oBobombBuddyHasTalkedToMario = BOBOMB_BUDDY_HAS_TALKED;
@@ -356,14 +356,14 @@ void bobomb_buddy_cannon_dialog(s16 dialogFirstText, s16 dialogSecondText) {
 }
 
 void bobomb_buddy_act_talk(void) {
-    if (set_mario_npc_dialog(1) == 2) {
+    if (set_mario_npc_dialog(MARIO_DIALOG_LOOK_FRONT) == MARIO_DIALOG_STATUS_SPEAK) {
         o->activeFlags |= ACTIVE_FLAG_INITIATED_TIME_STOP;
 
         switch (o->oBobombBuddyRole) {
             case BOBOMB_BUDDY_ROLE_ADVICE:
                 if (cutscene_object_with_dialog(CUTSCENE_DIALOG, o, o->oBehParams2ndByte)
                     != BOBOMB_BUDDY_BP_STYPE_GENERIC) {
-                    set_mario_npc_dialog(0);
+                    set_mario_npc_dialog(MARIO_DIALOG_STOP);
 
                     o->activeFlags &= ~ACTIVE_FLAG_INITIATED_TIME_STOP;
                     o->oBobombBuddyHasTalkedToMario = BOBOMB_BUDDY_HAS_TALKED;
@@ -383,7 +383,7 @@ void bobomb_buddy_act_talk(void) {
 }
 
 void bobomb_buddy_act_turn_to_talk(void) {
-    s16 sp1e = o->header.gfx.unk38.animFrame;
+    s16 sp1e = o->header.gfx.animInfo.animFrame;
     if ((sp1e == 5) || (sp1e == 16))
         cur_obj_play_sound_2(SOUND_OBJ_BOBOMB_WALK);
 

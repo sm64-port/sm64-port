@@ -254,6 +254,9 @@ f32 painting_ripple_y(struct Painting *painting, s8 ySource) {
             return painting->size / 2.0; // some concentric ripples don't care about Mario
             break;
     }
+#ifdef AVOID_UB
+    return 0.0f;
+#endif
 }
 
 /**
@@ -279,6 +282,9 @@ f32 painting_nearest_4th(struct Painting *painting) {
     } else if (painting->floorEntered & ENTER_RIGHT) {
         return thirdQuarter;
     }
+#ifdef AVOID_UB
+    return 0.0f;
+#endif
 }
 
 /**
@@ -310,6 +316,9 @@ f32 painting_ripple_x(struct Painting *painting, s8 xSource) {
             return painting->size / 2.0;
             break;
     }
+#ifdef AVOID_UB
+    return 0.0f;
+#endif
 }
 
 /**
@@ -577,7 +586,7 @@ void painting_update_ripple_state(struct Painting *painting) {
         //! After ~6.47 days, paintings with RIPPLE_TRIGGER_CONTINUOUS will increment this to
         //! 16777216 (1 << 24), at which point it will freeze (due to floating-point
         //! imprecision?) and the painting will stop rippling. This happens to HMC, DDD, and
-        //! CotMC. This happens on Wii VC. Untested on N64 and Wii U VC.
+        //! CotMC.
         painting->rippleTimer += 1.0;
     }
     if (painting->rippleTrigger == RIPPLE_TRIGGER_PROXIMITY) {
