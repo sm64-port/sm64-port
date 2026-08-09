@@ -22,6 +22,7 @@
 #include "sm64.h"
 #include "text_strings.h"
 #include "types.h"
+#include "pc/psp_me.h"
 
 u16 gDialogColorFadeTimer;
 s8 gLastDialogLineNum;
@@ -2484,9 +2485,8 @@ void print_hud_pause_colorful_str(void) {
     gSPDisplayList(gDisplayListHead++, dl_rgba16_text_end);
     
     /* Render sound type here */
-    extern int volatile *mediaengine_sound_ptr;
     print_text(0, 0, "SOUND:");
-    print_text(0 + (4 * 16), 0, ((*mediaengine_sound_ptr) ? "ME" : "CPU"));
+    print_text(0 + (4 * 16), 0, psp_me_is_active() ? "ME" : "CPU");
 }
 
 void render_pause_castle_course_stars(s16 x, s16 y, s16 fileNum, s16 courseNum) {

@@ -82,6 +82,20 @@ struct LoadedVertex {
     uint32_t clip_rej;
 } __attribute__((packed, aligned(16)));
 
+#if defined(TARGET_PSP)
+typedef char LoadedVertex_vfpu_size_check[(sizeof(struct LoadedVertex) == 48) ? 1 : -1];
+#ifdef GBI_FLOATS
+typedef char Vtx_vfpu_size_check[(sizeof(Vtx) == 24) ? 1 : -1];
+#else
+typedef char Vtx_vfpu_size_check[(sizeof(Vtx) == 16) ? 1 : -1];
+#endif
+extern uint32_t gfx_clip_to_hyperplane_vfpu(struct LoadedVertex *dest,
+                                            const struct LoadedVertex *source,
+                                            const float plane[4], uint32_t in_count);
+extern void gfx_transform_vertices_vfpu(struct LoadedVertex *dest, const Vtx *source,
+                                        uint32_t count, const float matrix[4][4]);
+#endif
+
 typedef struct VertexColor {
 	unsigned short u, v;
 	struct RGBA color;
@@ -193,6 +207,7 @@ static struct RenderingState {
     bool decal_mode;
     bool alpha_blend;
     bool tri_pipeline_dirty;
+    bool backend_state_dirty;
     struct TriPipelineState tri_pipeline;
 } rendering_state __attribute__((aligned(16)));
 
@@ -372,7 +387,7 @@ void gfx_clip_interpolate_vert(struct LoadedVertex* out, const struct  LoadedVer
 //	Copyright (C) 2002-2006 Nikolaus Gebhardt/Alten Thomas
 //
 //*****************************************************************************
-static const float NDCPlane[6][4] =
+static const float NDCPlane[6][4] __attribute__((aligned(16))) =
 {
 	{  0.f,  0.f,  1.f, -1.f },	// near
 	{  1.f,  0.f,  0.f, -1.f },	// left
@@ -384,6 +399,9 @@ static const float NDCPlane[6][4] =
 
 static uint32_t clipToHyperPlane( struct LoadedVertex *dest, const struct LoadedVertex *source, uint32_t inCount, const float plane[4] )
 {
+#if defined(TARGET_PSP)
+	return gfx_clip_to_hyperplane_vfpu(dest, source, plane, inCount);
+#else
 	uint32_t outCount;
 	struct LoadedVertex *out;
 
@@ -450,6 +468,7 @@ static uint32_t clipToHyperPlane( struct LoadedVertex *dest, const struct Loaded
 	}
 
 	return outCount;
+#endif
 }
 
 uint32_t clip_to_frustum( struct LoadedVertex * v0, struct LoadedVertex * v1, uint32_t vIn )
@@ -917,38 +936,44 @@ static inline void gfx_mark_tri_pipeline_dirty(void) {
 }
 
 static void gfx_prepare_tri_pipeline_state(void) {
+    bool backend_state_dirty;
+
     if (!rendering_state.tri_pipeline_dirty) {
         return;
     }
 
+    backend_state_dirty = rendering_state.backend_state_dirty;
+
     bool depth_test = (rsp.geometry_mode & G_ZBUFFER) == G_ZBUFFER;
-    if (depth_test != rendering_state.depth_test) {
+    if (backend_state_dirty || depth_test != rendering_state.depth_test) {
         gfx_flush();
         gfx_rapi->set_depth_test(depth_test);
         rendering_state.depth_test = depth_test;
     }
 
     bool z_upd = (rdp.other_mode_l & Z_UPD) == Z_UPD;
-    if (z_upd != rendering_state.depth_mask) {
+    if (backend_state_dirty || z_upd != rendering_state.depth_mask) {
         gfx_flush();
         gfx_rapi->set_depth_mask(z_upd);
         rendering_state.depth_mask = z_upd;
     }
 
     bool zmode_decal = (rdp.other_mode_l & ZMODE_DEC) == ZMODE_DEC;
-    if (zmode_decal != rendering_state.decal_mode) {
+    if (backend_state_dirty || zmode_decal != rendering_state.decal_mode) {
         gfx_flush();
         gfx_rapi->set_zmode_decal(zmode_decal);
         rendering_state.decal_mode = zmode_decal;
     }
 
-    if (rdp.viewport_or_scissor_changed) {
-        if (memcmp(&rdp.viewport, &rendering_state.viewport, sizeof(rdp.viewport)) != 0) {
+    if (backend_state_dirty || rdp.viewport_or_scissor_changed) {
+        if (backend_state_dirty ||
+            memcmp(&rdp.viewport, &rendering_state.viewport, sizeof(rdp.viewport)) != 0) {
             gfx_flush();
             gfx_rapi->set_viewport(rdp.viewport.x, rdp.viewport.y, rdp.viewport.width, rdp.viewport.height);
             rendering_state.viewport = rdp.viewport;
         }
-        if (memcmp(&rdp.scissor, &rendering_state.scissor, sizeof(rdp.scissor)) != 0) {
+        if (backend_state_dirty ||
+            memcmp(&rdp.scissor, &rendering_state.scissor, sizeof(rdp.scissor)) != 0) {
             gfx_flush();
             gfx_rapi->set_scissor(rdp.scissor.x, rdp.scissor.y, rdp.scissor.width, rdp.scissor.height);
             rendering_state.scissor = rdp.scissor;
@@ -984,13 +1009,13 @@ static void gfx_prepare_tri_pipeline_state(void) {
 
     struct ColorCombiner *comb = rendering_state.color_combiner;
     struct ShaderProgram *prg = comb->prg;
-    if (prg != rendering_state.shader_program) {
+    if (backend_state_dirty || prg != rendering_state.shader_program) {
         gfx_flush();
         gfx_rapi->unload_shader(rendering_state.shader_program);
         gfx_rapi->load_shader(prg);
         rendering_state.shader_program = prg;
     }
-    if (use_alpha != rendering_state.alpha_blend) {
+    if (backend_state_dirty || use_alpha != rendering_state.alpha_blend) {
         gfx_flush();
         gfx_rapi->set_use_alpha(use_alpha);
         rendering_state.alpha_blend = use_alpha;
@@ -1006,7 +1031,8 @@ static void gfx_prepare_tri_pipeline_state(void) {
                 import_texture(i);
                 rdp.textures_changed[i] = false;
             }
-            if (linear_filter != rendering_state.textures[i]->linear_filter ||
+            if (backend_state_dirty ||
+                linear_filter != rendering_state.textures[i]->linear_filter ||
                 rdp.texture_tile.cms != rendering_state.textures[i]->cms ||
                 rdp.texture_tile.cmt != rendering_state.textures[i]->cmt) {
                 gfx_flush();
@@ -1057,6 +1083,7 @@ static void gfx_prepare_tri_pipeline_state(void) {
     }
 
     rendering_state.tri_pipeline_dirty = false;
+    rendering_state.backend_state_dirty = false;
 }
 
 static inline float dot(const float a[3], const float b[3])
@@ -1201,13 +1228,19 @@ struct ShaderProgram {
 };
 
 static void gfx_sp_vertex(size_t n_vertices, size_t dest_index, const Vtx *vertices) {
+#if !defined(TARGET_PSP)
     float temp_vec[4] __attribute__((aligned(16)));
     float proj_vec[4] __attribute__((aligned(16)));
+#else
+    gfx_transform_vertices_vfpu(&rsp.loaded_vertices[dest_index], vertices, n_vertices,
+                                rsp.MP_matrix);
+#endif
     for (size_t i = 0; i < n_vertices; i++, dest_index++) {
         const Vtx_t *v = &vertices[i].v;
         const Vtx_tn *vn = &vertices[i].n;
         struct LoadedVertex *d = &rsp.loaded_vertices[dest_index];
 
+#if !defined(TARGET_PSP)
         temp_vec[0] = v->ob[0];
         temp_vec[1] = v->ob[1];
         temp_vec[2] = v->ob[2];
@@ -1233,6 +1266,12 @@ static void gfx_sp_vertex(size_t n_vertices, size_t dest_index, const Vtx *verti
         const float y = proj_vec[1];
         const float z = proj_vec[2];
         float w = proj_vec[3];
+#else
+        const float x = gfx_adjust_x_for_aspect_ratio(d->_x);
+        const float y = d->_y;
+        const float z = d->_z;
+        float w = d->_w;
+#endif
 
         short U = v->tc[0] * rsp.texture_scaling_factor.s >> 16;
         short V = v->tc[1] * rsp.texture_scaling_factor.t >> 16;
@@ -1300,9 +1339,11 @@ static void gfx_sp_vertex(size_t n_vertices, size_t dest_index, const Vtx *verti
         if (z < -w) d->clip_rej |= Z_POS;
         if (z > w) d->clip_rej |= Z_NEG;
 
+#if !defined(TARGET_PSP)
         d->x = v->ob[0];
         d->y = v->ob[1];
         d->z = v->ob[2];
+#endif
 
         d->_x = x;
         d->_y = y;
@@ -2208,6 +2249,7 @@ void gfx_init(struct GfxWindowManagerAPI *wapi, struct GfxRenderingAPI *rapi, co
     gfx_rapi->init();
     rendering_state.color_combiner_valid = false;
     rendering_state.tri_pipeline_dirty = true;
+    rendering_state.backend_state_dirty = true;
 
     int i;
     for(i=0;i<30;i++){
@@ -2325,4 +2367,35 @@ void gfx_end_frame(void) {
     if(frame_counter>=29){
         //printf("TOTAL TIME FRAME: %2.3f ms FPS %2.3f\n", delta, 1000/delta);
     }
+}
+
+static void gfx_invalidate_render_state(void) {
+    gfx_flush();
+    gfx_rapi->unload_shader(NULL);
+    rendering_state.shader_program = NULL;
+    rendering_state.color_combiner_valid = false;
+    rendering_state.tri_pipeline_dirty = true;
+    rendering_state.backend_state_dirty = true;
+    rdp.viewport_or_scissor_changed = true;
+    rdp.textures_changed[0] = true;
+    rdp.textures_changed[1] = true;
+}
+
+void gfx_render_callback_frame(void (*draw_callback)(void *arg), void *arg) {
+    gfx_start_frame();
+
+    if (!gfx_wapi->start_frame()) {
+        dropped_frame = true;
+        return;
+    }
+
+    dropped_frame = false;
+    gfx_rapi->start_frame();
+    if (draw_callback != NULL) {
+        draw_callback(arg);
+    }
+    gfx_rapi->end_frame();
+    gfx_wapi->swap_buffers_begin();
+    gfx_end_frame();
+    gfx_invalidate_render_state();
 }

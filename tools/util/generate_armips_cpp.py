@@ -91,7 +91,9 @@ file_header =  \
 """// armips assembler v0.11
 // https://github.com/Kingcom/armips/
 // To simplify compilation, all files have been concatenated into one.
-// MIPS only, ARM is not included.\n\n"""
+// MIPS only, ARM is not included.
+
+#include <cstdint>\n\n"""
 
 def banned(line):
     return '#pragma once' in line or '#include "' in line

@@ -7,22 +7,66 @@
 #include <string.h>
 #include <pspsdk.h>
 #include <pspkernel.h>
+#include <pspctrl.h>
 #include <psppower.h>
 #include <pspdisplay.h>
 #include <pspgu.h>
 #include <pspgum.h>
-#include <psprtc.h>
-
-#include "../psp_audio_stack.h"
-#include "../psp_me.h"
+#include <stdint.h>
 
 #define GFX_API_NAME "PSP - sceGU"
 #define SCR_WIDTH (480)
 #define SCR_HEIGHT (272)
 
-static int force_30fps = 1;
-static unsigned int last_time = 0;
-int audio_manager_thid = 0; 
+#define PSP_VI_RATE_HZ 60U
+#define PSP_VI_FRAME_BASE_USEC 16666U
+#define PSP_VI_FRAME_REMAINDER 40U
+#define PSP_GAME_UPDATE_RATE 2U
+
+static uint32_t sNextFrameCompletionUsec;
+static uint32_t sFramePacingRemainder;
+static bool sFramePacingInitialized;
+
+static inline int32_t gfx_psp_time_diff(uint32_t a, uint32_t b) {
+    return (int32_t)(a - b);
+}
+
+/* Mirror OOT's VI remainder accumulation. At updateRate 2 this produces
+ * 33333, 33333, 33334 microsecond intervals, averaging exactly 30 Hz. */
+static uint32_t gfx_psp_get_frame_usec(void) {
+    uint32_t frame_usec = PSP_VI_FRAME_BASE_USEC * PSP_GAME_UPDATE_RATE;
+
+    sFramePacingRemainder += PSP_VI_FRAME_REMAINDER * PSP_GAME_UPDATE_RATE;
+    if (sFramePacingRemainder >= PSP_VI_RATE_HZ) {
+        uint32_t extra_usec = sFramePacingRemainder / PSP_VI_RATE_HZ;
+
+        frame_usec += extra_usec;
+        sFramePacingRemainder -= extra_usec * PSP_VI_RATE_HZ;
+    }
+
+    return frame_usec;
+}
+
+static void gfx_psp_pace_presented_frame(void) {
+    uint32_t now = sceKernelGetSystemTimeLow();
+    uint32_t frame_usec = gfx_psp_get_frame_usec();
+    int32_t wait_usec;
+
+    if (!sFramePacingInitialized) {
+        sNextFrameCompletionUsec = now;
+        sFramePacingInitialized = true;
+    }
+
+    wait_usec = gfx_psp_time_diff(sNextFrameCompletionUsec, now);
+    if (wait_usec > 0) {
+        sceKernelDelayThread((uint32_t)wait_usec);
+    } else if (wait_usec < 0) {
+        /* Do not run catch-up frames after a missed deadline. */
+        sNextFrameCompletionUsec = now;
+    }
+
+    sNextFrameCompletionUsec += frame_usec;
+}
 
 /* I forgot why we need this */
 void __assert_func(UNUSED const char *file, UNUSED int line, UNUSED const char *method, UNUSED const char *expression) {
@@ -40,57 +84,14 @@ int isspace(int _c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r';
 }
 
-static int exitCallback(UNUSED int arg1, UNUSED int arg2, UNUSED void *common) {
-    sceKernelTerminateDeleteThread(audio_manager_thid);
-    psp_me_shutdown();
-    sceKernelExitGame();
-    return 0;
-}
-
-static int callbackThread(UNUSED SceSize args, UNUSED void *argp) {
-    int cbid;
-
-    cbid = sceKernelCreateCallback("Exit Callback", exitCallback, NULL);
-    sceKernelRegisterExitCallback(cbid);
-
-    sceKernelSleepThreadCB();
-
-    return 0;
-}
-
-
-
-void init_audiomanager(void) {
-    extern int audioOutput(SceSize args, void *argp);
-    extern int audio_manager_thid;
-    extern int mediaengine_available;
-    extern int volatile mediaengine_sound;
-
-    mediaengine_available = psp_me_init();
-    mediaengine_sound = mediaengine_available;
-    audio_manager_thid = sceKernelCreateThread("AudioOutput", audioOutput, 0x12 , 0x20000, THREAD_ATTR_USER | THREAD_ATTR_VFPU, NULL);
-    sceKernelStartThread(audio_manager_thid, 0, NULL);
-}
-
-void kill_audiomanager(void) {
-    sceKernelTerminateDeleteThread(audio_manager_thid);
-    sceKernelDelayThread(250);
-}
-
 static void gfx_psp_init(UNUSED const char *game_name, UNUSED bool start_in_fullscreen) {
-
-    int thid = 0;
-
-    thid = sceKernelCreateThread("update_thread", callbackThread, 0x20, 0xFA0, 0, 0);
-    if (thid >= 0) {
-        sceKernelStartThread(thid, 0, 0);
-    }
+    sNextFrameCompletionUsec = 0;
+    sFramePacingRemainder = 0;
+    sFramePacingInitialized = false;
 
     scePowerSetClockFrequency(333, 333, 166);
-    sceKernelDelayThread(250);
-
-    pspDebugScreenInitEx(0, PSP_DISPLAY_PIXEL_FORMAT_8888, 0);
-    last_time = sceKernelGetSystemTimeLow();
+    sceCtrlSetSamplingCycle(0);
+    sceCtrlSetSamplingMode(PSP_CTRL_MODE_ANALOG);
 }
 
 static void gfx_psp_set_fullscreen_changed_callback(UNUSED void (*on_fullscreen_changed)(bool is_now_fullscreen)) {
@@ -126,21 +127,7 @@ static bool gfx_psp_start_frame(void) {
 }
 
 static void gfx_psp_swap_buffers_begin(void) {
-    // Number of microseconds a frame should take (30 fps)
-    const unsigned int FRAME_TIME_US = 33333;
-    const unsigned int cur_time = sceKernelGetSystemTimeLow();
-    const unsigned int elapsed = cur_time - last_time;
-    last_time = cur_time;
-
-    if (force_30fps) {
-        if (elapsed < FRAME_TIME_US) {
-#ifdef DEBUG
-            printf("elapsed %d us fps %f\n", elapsed, (1000.0f * 1000.0f) / elapsed);
-#endif
-            sceKernelDelayThread(FRAME_TIME_US - elapsed);
-            last_time = cur_time + (FRAME_TIME_US - elapsed);
-        }
-    }
+    gfx_psp_pace_presented_frame();
 }
 
 static void gfx_psp_swap_buffers_end(void) {

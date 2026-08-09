@@ -2,6 +2,9 @@
 #define GFX_PC_H
 
 #include <stdbool.h>
+#include <stdint.h>
+
+#include <PR/gbi.h>
 
 struct GfxRenderingAPI;
 struct GfxWindowManagerAPI;
@@ -22,6 +25,7 @@ struct GfxRenderingAPI *gfx_get_current_rendering_api(void);
 void gfx_start_frame(void);
 void gfx_run(Gfx *commands);
 void gfx_end_frame(void);
+void gfx_render_callback_frame(void (*draw_callback)(void *arg), void *arg);
 
 #ifdef __cplusplus
 }

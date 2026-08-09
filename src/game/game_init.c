@@ -19,6 +19,7 @@
 #include "segment2.h"
 #include "segment_symbols.h"
 #include "thread6.h"
+#include "pc/psp_me.h"
 #include <prevent_bss_reordering.h>
 
 // FIXME: I'm not sure all of these variables belong in this file, but I don't
@@ -81,9 +82,6 @@ static void calculate_frameTime_from_OSTime(OSTime diff) {
 }
 
 static void render_fps(void) {
-    extern int mediaengine_available;
-    extern int volatile mediaengine_sound;
-
     // Toggle rendering framerate with the L button.
     if ((gPlayer1Controller->buttonPressed & R_TRIG) && (gPlayer1Controller->buttonPressed & L_TRIG)) {
         gRenderFPS ^= 1;
@@ -91,17 +89,10 @@ static void render_fps(void) {
 
     if ((gPlayer1Controller->buttonPressed & R_TRIG) && (gPlayer1Controller->buttonPressed & B_BUTTON)) {
         gProcessAudio ^= 1;
-        if(mediaengine_available){
-            mediaengine_sound ^= 1;
-        }
     }
 
     if ((gPlayer1Controller->buttonPressed & R_TRIG) && (gPlayer1Controller->buttonPressed & Z_TRIG)) {
         gDoDither ^= 1;
-        extern void kill_audiomanager(void);
-        extern void init_audiomanager(void);
-        kill_audiomanager();
-        init_audiomanager();
     }
 
     if ((gPlayer1Controller->buttonPressed & L_TRIG)) {

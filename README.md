@@ -37,9 +37,8 @@ A prior copy of the game is required to extract the assets.
 
 #### PSP
 Notes:Currently only supported building under linux and WSL
-**There is a file in the ``psp/`` folder called ``snd_eng.prx``**
-- This file is used to accelerate the sound generation and increase performance. 
-- It belongs next to the EBOOT.PBP or PRX.
+
+Audio generation uses the Media Engine through `libme-core`; no external sound PRX is required beside the EBOOT.
 
 1. Install the PSP toolchain https://github.com/pspdev/psptoolchain.
 2. Place a Super Mario 64 ROM called `baserom.<VERSION>.z64` into the repository's root directory for asset extraction, where `VERSION` can be `us`, `jp`, or `eu`.

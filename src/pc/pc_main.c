@@ -37,6 +37,8 @@
 #if defined(TARGET_PSP)
 #include <pspsdk.h>
 #include <pspkernel.h>
+#include "psp_home_menu.h"
+#include "psp_me.h"
 #define MODULE_NAME "SM64 for PSP"
 #ifndef SRC_VER
 #define SRC_VER "UNKNOWN"
@@ -93,99 +95,50 @@ void send_display_list(struct SPTask *spTask) {
 #define SAMPLES_LOW 528
 #endif
 
-#if defined(TARGET_PSP)
-
-
-#include "psp_audio_stack.h"
-#include "psp_me.h"
-#include "sceGuDebugPrint.h"
-
-typedef int JobData;
-
-
-static s16 audio_buffer[SAMPLES_HIGH * 2 * 2] __attribute__((aligned(64)));
-extern struct Stack* stack;
-int volatile mediaengine_sound = 0;
-int volatile *mediaengine_sound_ptr = &mediaengine_sound;
-int mediaengine_available = 0;
-
-int __attribute__((optimize("O0"))) run_me_audio_cpu(JobData data) {
-    (void)data;
-    create_next_audio_buffer(audio_buffer + 0 * (SAMPLES_HIGH * 2), SAMPLES_HIGH);
-    create_next_audio_buffer(audio_buffer + 1 * (SAMPLES_HIGH * 2), SAMPLES_HIGH);
-    return 0;
-}
-
-int run_me_audio(JobData data) {
-    // Offload the whole buffer generation job; dispatching each mixer primitive would
-    // spend more time synchronizing with the ME than the primitive itself.
-    if (mediaengine_sound && psp_me_run_audio_job()) {
-        return 0;
-    }
-    return run_me_audio_cpu(data);
-}
-
-int audioOutput(SceSize args, void *argp) {
-    (void)args;
-    (void)argp;
-    bool running = true;
-#ifdef DEBUG
-    char buffer[64];
-#endif
-
-
-    while (running) {
-        AudioTask task = stack_pop(stack);
-
-        #ifdef DEBUG
-        switch(task) {
-            case NOP: sceGuDebugPrint(8,8,0xffffffff, "NOP");break;
-            case QUIT: sceGuDebugPrint(8,16,0xffffffff, "QUIT");break;
-            case GENERATE: sceGuDebugPrint(8,24,0xffffffff, "GENERATE");break;
-            case PLAY: sceGuDebugPrint(8,32,0xffffffff, "PLAY");break;
-        }
-        sprintf(buffer, "SOUND: %s", (mediaengine_sound ? "ME" : "CPU"));
-        sceGuDebugPrint(10,48,0xffffffff, buffer);
-        #endif
-
-        switch (task) {
-            case NOP:       {; sceKernelDelayThread(1000 + 1000  * (mediaengine_sound)); }break;
-            case QUIT:      {; running = false; }break;
-            case GENERATE:  {;
-
-            {
-                run_me_audio(0);
-                sceKernelDcacheWritebackInvalidateRange(audio_buffer,sizeof(audio_buffer));
-            }
-            stack_push(stack, PLAY);
-            sceKernelDelayThread(250);
-            }
-            break;
-            case PLAY:      {;
-                //sceKernelDelayThread(100);
-                //stack_clear(stack);
-                audio_api->play((u8 *)audio_buffer, 2 /* 2 buffers */ * SAMPLES_HIGH * sizeof(short) * 2 /* stereo */);
-            }
-            break;
-        }
-    }
-    sceIoWrite(1,"Audio Manager Exit!\n",21);
-    SceUID thid = sceKernelGetThreadId();
-    sceKernelTerminateDeleteThread(thid);
-    return 0;
-}
+#if !defined(TARGET_PSP)
+static s16 audio_buffer[SAMPLES_HIGH * 2 * 2];
 #endif
 
 extern int gProcessAudio;
 int gFrame=0;
+static void save_config(void);
+
 void produce_one_frame(void) {
-    /* Generate sound */
-    stack_push(stack, GENERATE);
+#if defined(TARGET_PSP)
+    psp_home_menu_poll_home_button();
+
+    if (psp_home_menu_is_open()) {
+        if (psp_home_menu_run_frame() == PSP_HOME_MENU_RESULT_EXIT_GAME) {
+            save_config();
+            audio_psp_shutdown();
+            sceKernelExitGame();
+            return;
+        }
+        gFrame++;
+        return;
+    }
 
     gfx_start_frame();
     game_loop_one_iteration();
     gFrame++;
     gfx_end_frame();
+#else
+    u32 num_audio_samples;
+    int samples_left;
+
+    gfx_start_frame();
+    game_loop_one_iteration();
+    gFrame++;
+
+    if (gProcessAudio) {
+        samples_left = audio_api->buffered();
+        num_audio_samples = samples_left < audio_api->get_desired_buffered() ? SAMPLES_HIGH : SAMPLES_LOW;
+        create_next_audio_buffer(audio_buffer, num_audio_samples);
+        create_next_audio_buffer(audio_buffer + (num_audio_samples * 2), num_audio_samples);
+        audio_api->play((u8 *)audio_buffer, 2 * num_audio_samples * sizeof(s16) * 2);
+    }
+    gfx_end_frame();
+#endif
 }
 
 #ifdef TARGET_WEB
@@ -230,6 +183,11 @@ static void on_fullscreen_changed(bool is_now_fullscreen) {
 }
 
 void main_func(const char *argv0) {
+#if defined(TARGET_PSP)
+    (void)psp_me_boot();
+    psp_home_menu_init();
+#endif
+
     static u32 pool[0x165000/8 / 4 * sizeof(void *) * 4];
     main_pool_init(pool, pool + sizeof(pool) / sizeof(pool[0]));
     gEffectsMemoryPool = mem_pool_init(0x4000, MEMORY_POOL_LEFT);
@@ -296,6 +254,12 @@ void main_func(const char *argv0) {
 
     audio_init();
     sound_init();
+
+#if defined(TARGET_PSP)
+    if (audio_api == &audio_psp) {
+        audio_psp_start();
+    }
+#endif
 
     thread5_game_loop(NULL);
 #ifdef TARGET_WEB

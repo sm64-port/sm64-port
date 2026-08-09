@@ -61,9 +61,6 @@ static void controller_psp_read(OSContPad *pad) {
     if (data.Buttons & configKeyCRight)
         pad->button |= R_CBUTTONS;
 
-    /* Always push start if home pushed */
-    if (data.Buttons & PSP_CTRL_HOME)
-        pad->button |= START_BUTTON;
 }
 
 struct ControllerAPI controller_psp = {

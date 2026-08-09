@@ -303,6 +303,10 @@ LEVEL_C_FILES := $(wildcard levels/*/leveldata.c) $(wildcard levels/*/script.c) 
 C_FILES := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.c)) $(LEVEL_C_FILES)
 CXX_FILES := $(foreach dir,$(SRC_DIRS),$(wildcard $(dir)/*.cpp))
 S_FILES := $(foreach dir,$(ASM_DIRS),$(wildcard $(dir)/*.s))
+ifeq ($(TARGET_PSP),1)
+  PSP_S_FILES := src/pc/gfx/gfx_clip_vfpu.s src/pc/gfx/gfx_transform_vfpu.s src/pc/psp_me_kcall.s
+  S_FILES += $(PSP_S_FILES)
+endif
 ULTRA_C_FILES := $(foreach dir,$(ULTRA_SRC_DIRS),$(wildcard $(dir)/*.c))
 GODDARD_C_FILES := $(foreach dir,$(GODDARD_SRC_DIRS),$(wildcard $(dir)/*.c))
 ifeq ($(TARGET_N64),1)
@@ -505,7 +509,7 @@ ifeq ($(TARGET_PSP),1)
   # Notes from neo
   #-gdwarf-2 -gstrict-dwarf -g3 --ffunction-sections -fdata-sections -Wl,-gc-sections
   PLATFORM_CFLAGS  := -DTARGET_PSP -DPSP -D__PSP__ -DSRC_VER=\"$(SRC_VER)\" -I$(PSPSDK_PREFIX)/include -I$(PSP_PREFIX)/include -G0 -D_PSP_FW_VERSION=500 -DNDEBUG -O3 -falign-functions=64 -flimit-function-alignment -g3 -fno-rounding-math -ffp-contract=off -Wfatal-errors -fsigned-char
-  PLATFORM_LDFLAGS := -L$(PSPSDK_PREFIX)/lib -L$(PSP_PREFIX)/lib -lme-core
+  PLATFORM_LDFLAGS := -L$(PSPSDK_PREFIX)/lib -L$(PSP_PREFIX)/lib -Wl,-u,sm64PspMeKcallImport -lme-core
   
   ifeq ($(PROFILE_PSP),1)
     # gprof builds run as ELF EBOOTs, not PRX modules.
@@ -539,7 +543,7 @@ ifeq ($(ENABLE_OPENGL),1)
     GFX_LDFLAGS += -lGL -lSDL2
   endif
   ifeq ($(TARGET_PSP),1)
-    GFX_LDFLAGS += -L$(PSPSDK_PREFIX)/lib -lpspdebug  -lpspgu -lpspvfpu -lpspctrl -lpspge -lpspdisplay -lpsphprm -lm -lpspsdk -lpsprtc -lpspaudio -lpsputility -lpspnet_inet -lpsppower -lc -lpspuser -lpspvram  
+    GFX_LDFLAGS += -L$(PSPSDK_PREFIX)/lib -lintrafont -lpspdebug -lpspgu -lpspvfpu -lpspctrl -lpspge -lpspdisplay -lpsphprm -lm -lpspsdk -lpsprtc -lpspaudio -lpsputility -lpspnet_inet -lpsppower -lc -lpspuser -lpspvram
   endif
 endif
 ifeq ($(ENABLE_DX11),1)
@@ -864,6 +868,11 @@ $(BUILD_DIR)/%.o: $(BUILD_DIR)/%.c
 	@$(CC_CHECK) $(CC_CHECK_CFLAGS) -MMD -MP -MT $@ -MF $(BUILD_DIR)/$*.d $<
 	$(CC) -c $(CFLAGS) -o $@ $<
 
+ifeq ($(TARGET_PSP),1)
+$(BUILD_DIR)/src/pc/%.o: src/pc/%.s
+	$(CC) -MMD -MP -MF $(@:.o=.d) -MT $@ -c -x assembler-with-cpp $(PLATFORM_CFLAGS) $(INCLUDE_CFLAGS) $(VERSION_CFLAGS) $(GRUCODE_CFLAGS) -o $@ $<
+endif
+
 $(BUILD_DIR)/%.o: %.s
 	$(HOST_AS) $(ASFLAGS) -MD $(BUILD_DIR)/$*.d -o $@ $<
 
@@ -901,7 +910,6 @@ TITLE := "sm64-port $(SRC_VER)"
 
 pbp: $(EXE)
 	@mkdir -p $(BUILD_DIR)/mario64
-	cp psp/snd_eng.prx $(BUILD_DIR)/mario64/
 	mksfoex -d MEMSIZE=1 $(TITLE) $(BUILD_DIR)/PARAM.SFO
 	@if [ "$(PROFILE_PSP)" = "1" ]; then \
 		pack-pbp $(BUILD_DIR)/mario64/EBOOT.PBP $(BUILD_DIR)/PARAM.SFO psp/EBOOT/ICON0.png NULL NULL psp/EBOOT/PIC0.png psp/EBOOT/SND0.at3 $(EXE) NULL; \
